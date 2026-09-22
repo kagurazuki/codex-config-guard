@@ -3,7 +3,17 @@
 ## 0.2.3 - 2026-09-22
 
 - Published repository metadata now points to `kagurazuki/codex-config-guard`.
+- Added GitHub Actions compatibility fix for unittest discovery.
+- Verified CI passes on Python 3.11, 3.12, and 3.13.
 - Kept funding links disabled until a real sponsorship channel is configured.
+
+## 0.2.2 - 2026-09-22
+
+- Added fail-closed one-time GitHub repository bootstrap helper (`scripts/publish_github.py`).
+- Added Windows-friendly GitHub publication handoff documentation.
+- Kept repository creation dry-run by default and refused to reuse an existing repository name.
+- Added repository identity/visibility read-back after bootstrap.
+- Updated outbound schema-fetch User-Agent strings to use the package version.
 
 ## 0.2.1 - 2026-09-22
 
@@ -32,11 +42,3 @@
 - Project-local ignored-setting warnings.
 - Schema diff for root and feature keys.
 - JSON output and stable finding IDs.
-
-## 0.2.2
-
-- Add fail-closed one-time GitHub repository bootstrap helper (`scripts/publish_github.py`).
-- Add Windows-friendly GitHub publication handoff documentation.
-- Keep repository creation dry-run by default and refuse to reuse an existing repository name.
-- Read back repository identity/visibility after bootstrap before declaring success.
-- Use the package version in outbound schema-fetch User-Agent strings.

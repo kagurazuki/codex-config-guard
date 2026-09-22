@@ -10,7 +10,7 @@ A local, read-only CLI for recurring Codex configuration problems:
 
 The project is intentionally local-first: no account, hosted backend, telemetry, or API key is required.
 
-**Status:** alpha / publication candidate. Runtime behavior is intentionally narrow and read-only.
+**Status:** public alpha. GitHub Actions passes on Python 3.11, 3.12, and 3.13. Runtime behavior is intentionally narrow and read-only.
 
 ## Install for development
 
