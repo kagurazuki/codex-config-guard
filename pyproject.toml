@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "codex-config-guard"
+version = "0.2.3"
+description = "Unofficial local validator and version-aware migration tool for OpenAI Codex config.toml files"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "Community project"}]
+dependencies = ["jsonschema>=4.23,<5"]
+keywords = ["codex", "config", "toml", "validator", "cli"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+
+[project.urls]
+Homepage = "https://github.com/kagurazuki/codex-config-guard"
+Repository = "https://github.com/kagurazuki/codex-config-guard"
+Issues = "https://github.com/kagurazuki/codex-config-guard/issues"
+
+[project.scripts]
+codex-config-guard = "codex_config_guard.cli:main"
+
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/codex_config_guard"]
