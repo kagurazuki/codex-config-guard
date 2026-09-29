@@ -24,7 +24,7 @@ pip install -e .
 Run the local unit tests:
 
 ```bash
-python -m unittest discover -s tests -v
+python -m unittest discover -s tests
 ```
 
 ## Validate a user config
