@@ -21,6 +21,12 @@ python -m venv .venv
 pip install -e .
 ```
 
+Run the local unit tests:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
 ## Validate a user config
 
 ```bash
