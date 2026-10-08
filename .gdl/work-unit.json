@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "work_unit": "issue-22-current-cutover",
+  "issue_number": 22,
+  "task_class": "critical",
+  "source_sha": "6eb36800dd00ccba107da275343b57337c9aa3a3",
+  "summary": "Promote the proven generic GDL V2 work-unit surface from candidate wording to Current wording without changing its safety architecture",
+  "instructions": "Implement Issue #22 exactly. This is the bounded Current-cutover patch authorized after Promotion Gate #20 returned PROMOTION_READY. Change only the allowed files. Make the generic GDL V2 work-unit surface Current in repository instructions, productionization/current/rollback documentation, workflow/CLI naming, and managed payload metadata/wording. Preserve all proven execution and security behavior: explicit route floors and no silent downgrade; deterministic work-unit branch/marker; duplicate/rerun fail-closed; dispatch receipt and unknown-outcome reconciliation; read-only GitHub workflow token; persist-credentials false; caller-only OpenAI API key outside agent payload/sandbox; no Codex GitHub credential; restricted hosted sandbox; exact source binding; bounded allowed paths/count; allowlisted unit profile; full patch/result/digest verification; caller-side controlled write-back only after verification; no direct-to-main agent path. Keep historical canary evidence intact. Preserve GDL v0.2 completely as the rollback path, but do not continue describing it as Current after this cutover patch is merged. Update tests so Current wording/metadata is positively asserted and obsolete candidate-only runtime wording is rejected. Do not release, deploy, publish, merge, close, or mutate any remote system from Codex. Run the full allowlisted unit profile.",
+  "allowed_paths": [
+    "AGENTS.md",
+    "docs/gdl-v2-productionization.md",
+    ".github/workflows/gdl-v2-work-unit.yml",
+    "scripts/gdl_v2_work_unit.py",
+    "src/codex_config_guard/gdl_v2_production.py",
+    "tests/test_gdl_v2_production.py"
+  ],
+  "max_changed_files": 6,
+  "test_profile": "unit",
+  "route": {
+    "model": "gpt-6-astra",
+    "reasoning_effort": "high"
+  }
+}
