@@ -3,9 +3,11 @@ import unittest
 
 from codex_config_guard.gdl_v2_agents import (
     CONNECTIVITY_INPUT,
+    EXPECTED_CONNECTIVITY_OUTPUT,
     build_connectivity_payload,
     create_connectivity_session,
     require_api_key,
+    run_connectivity_canary,
 )
 
 
@@ -21,6 +23,22 @@ class _FakeResponse:
 
     def read(self):
         return self._body
+
+
+class _FakeSseResponse:
+    def __init__(self, events: list[dict]):
+        self._lines = [
+            f"data: {json.dumps(event)}\n".encode("utf-8") for event in events
+        ]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def __iter__(self):
+        return iter(self._lines)
 
 
 class AgentsConnectivityTests(unittest.TestCase):
@@ -71,7 +89,7 @@ class AgentsConnectivityTests(unittest.TestCase):
         self.assertNotIn(secret, json.dumps(payload))
         self.assertEqual(require_api_key({"OPENAI_API_KEY": secret}), secret)
 
-    def test_live_request_keeps_key_in_authorization_header_only(self):
+    def test_session_creation_keeps_key_in_authorization_header_only(self):
         captured = {}
 
         def opener(request, timeout):
@@ -95,6 +113,127 @@ class AgentsConnectivityTests(unittest.TestCase):
         self.assertEqual(result["session_id"], "sess_canary_123")
         self.assertEqual(result["status"], "in_progress")
         self.assertIsNone(result["environment_id"])
+
+    def test_streamed_canary_requires_completed_root_turn_and_exact_output(self):
+        captured = {}
+        events = [
+            {
+                "type": "agent.session.created",
+                "session": {"id": "sess_stream_123"},
+            },
+            {
+                "type": "agent.session.turn.output_text.done",
+                "text": EXPECTED_CONNECTIVITY_OUTPUT,
+            },
+            {
+                "type": "agent.session.turn.completed",
+                "turn": {"id": "turn_stream_123", "subagent_id": None},
+            },
+        ]
+
+        def opener(request, timeout):
+            captured["authorization"] = request.get_header("Authorization")
+            captured["accept"] = request.get_header("Accept")
+            captured["body"] = request.data.decode("utf-8")
+            captured["timeout"] = timeout
+            return _FakeSseResponse(events)
+
+        secret = "sk-test-stream-only"
+        result = run_connectivity_canary(
+            build_connectivity_payload("routine"), secret, opener=opener
+        )
+
+        request_payload = json.loads(captured["body"])
+        self.assertTrue(request_payload["stream"])
+        self.assertEqual(captured["authorization"], f"Bearer {secret}")
+        self.assertEqual(captured["accept"], "text/event-stream")
+        self.assertNotIn(secret, captured["body"])
+        self.assertEqual(result["session_id"], "sess_stream_123")
+        self.assertEqual(result["turn_id"], "turn_stream_123")
+        self.assertEqual(result["turn_status"], "completed")
+        self.assertEqual(result["output_text"], EXPECTED_CONNECTIVITY_OUTPUT)
+        self.assertTrue(result["verified_output"])
+
+    def test_stream_close_before_completion_fails_closed(self):
+        events = [
+            {
+                "type": "agent.session.created",
+                "session": {"id": "sess_incomplete"},
+            },
+            {
+                "type": "agent.session.turn.output_text.done",
+                "text": EXPECTED_CONNECTIVITY_OUTPUT,
+            },
+        ]
+
+        with self.assertRaisesRegex(RuntimeError, "before the root turn completed"):
+            run_connectivity_canary(
+                build_connectivity_payload("routine"),
+                "sk-test",
+                opener=lambda request, timeout: _FakeSseResponse(events),
+            )
+
+    def test_output_mismatch_fails_closed(self):
+        events = [
+            {
+                "type": "agent.session.created",
+                "session": {"id": "sess_mismatch"},
+            },
+            {
+                "type": "agent.session.turn.output_text.done",
+                "text": "NOT_THE_EXPECTED_OUTPUT",
+            },
+            {
+                "type": "agent.session.turn.completed",
+                "turn": {"id": "turn_mismatch", "subagent_id": None},
+            },
+        ]
+
+        with self.assertRaisesRegex(RuntimeError, "output mismatch"):
+            run_connectivity_canary(
+                build_connectivity_payload("routine"),
+                "sk-test",
+                opener=lambda request, timeout: _FakeSseResponse(events),
+            )
+
+    def test_root_turn_failure_fails_closed(self):
+        events = [
+            {
+                "type": "agent.session.created",
+                "session": {"id": "sess_failed"},
+            },
+            {
+                "type": "agent.session.turn.failed",
+                "turn": {
+                    "id": "turn_failed",
+                    "subagent_id": None,
+                    "error": {"message": "synthetic failure"},
+                },
+            },
+        ]
+
+        with self.assertRaisesRegex(RuntimeError, "synthetic failure"):
+            run_connectivity_canary(
+                build_connectivity_payload("routine"),
+                "sk-test",
+                opener=lambda request, timeout: _FakeSseResponse(events),
+            )
+
+    def test_unexpected_required_action_fails_closed(self):
+        events = [
+            {
+                "type": "agent.session.created",
+                "session": {"id": "sess_action"},
+            },
+            {"type": "agent.session.requires_action"},
+        ]
+
+        with self.assertRaisesRegex(RuntimeError, "requires external action"):
+            run_connectivity_canary(
+                build_connectivity_payload("routine"),
+                "sk-test",
+                opener=lambda request, timeout: _FakeSseResponse(events),
+            )
 
 
 if __name__ == "__main__":
