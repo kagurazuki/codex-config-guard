@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: List matching Agents sessions read-only
+      - name: Reconcile matching Agents session read-only
         env:
           OPENAI_API_KEY: ${{ secrets.GDL_V2_OPENAI_API_KEY }}
         run: |
@@ -33,6 +33,11 @@ jobs:
               with urlopen(req, timeout=30) as response:
                   return json.loads(response.read().decode("utf-8"))
 
+          def safe_error(value):
+              if not isinstance(value, dict):
+                  return None
+              return {k: value.get(k) for k in ("type", "code", "message") if value.get(k) is not None}
+
           page = get(BASE + "?" + urlencode({"limit": 100, "order": "desc"}))
           matches = []
           for session in page.get("data", []):
@@ -41,6 +46,18 @@ jobs:
                   continue
               sid = session.get("id")
               turns = get(f"{BASE}/{sid}/turns?" + urlencode({"limit": 100, "order": "desc"})).get("data", [])
+              turn_summaries = []
+              for t in turns:
+                  tid = t.get("id")
+                  detail = get(f"{BASE}/{sid}/turns/{tid}") if tid else {}
+                  turn_summaries.append({
+                      "id": tid,
+                      "status": detail.get("status", t.get("status")),
+                      "created_at": detail.get("created_at", t.get("created_at")),
+                      "completed_at": detail.get("completed_at", t.get("completed_at")),
+                      "subagent_id": detail.get("subagent_id", t.get("subagent_id")),
+                      "error": safe_error(detail.get("error")),
+                  })
               artifacts = get(f"{BASE}/{sid}/artifacts?" + urlencode({"limit": 100, "order": "desc"})).get("data", [])
               matches.append({
                   "session_id": sid,
@@ -54,11 +71,7 @@ jobs:
                       "model": (session.get("agent") or {}).get("model") if isinstance(session.get("agent"), dict) else None,
                       "reasoning": (session.get("agent") or {}).get("reasoning") if isinstance(session.get("agent"), dict) else None,
                   },
-                  "turns": [{
-                      "id": t.get("id"), "status": t.get("status"),
-                      "created_at": t.get("created_at"), "completed_at": t.get("completed_at"),
-                      "subagent_id": t.get("subagent_id"),
-                  } for t in turns],
+                  "turns": turn_summaries,
                   "artifacts": [{
                       "id": a.get("id"), "path": a.get("path"),
                       "created_at": a.get("created_at"), "turn_id": a.get("turn_id"),
