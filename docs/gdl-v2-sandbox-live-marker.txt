@@ -1,3 +1,3 @@
 GDL V2 Phase 2 hosted-sandbox canary marker.
-This file will be revised only to trigger one bounded explicit live run.
-No repository write-back or production cutover is authorized.
+This revision triggers one bounded managed sandbox run with independent patch/result artifact verification.
+No GitHub write credential, repository write-back, merge, release, deploy, or production cutover is authorized.
