@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dry-run-first V2 candidate entry; GitHub write-back belongs to the control plane."""
+"""Dry-run-first GDL V2 Current entry; GitHub write-back belongs to the control plane."""
 from __future__ import annotations
 
 import argparse
@@ -15,7 +15,7 @@ from codex_config_guard.gdl_v2_work_unit import branch_name, load_contract, run_
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Prepare or run one bounded GDL V2 candidate work unit.")
+    parser = argparse.ArgumentParser(description="Prepare or run one bounded GDL V2 Current work unit.")
     parser.add_argument("contract_file", type=Path)
     parser.add_argument("--repository", type=Path, default=Path("."))
     parser.add_argument("--output-dir", type=Path, default=Path("gdl-v2-work-unit-artifacts"))
