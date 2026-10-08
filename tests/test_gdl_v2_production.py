@@ -46,11 +46,17 @@ class PayloadTests(unittest.TestCase):
         instruction = payload["input"]
         for text in (contract.source_sha, contract.summary, contract.instructions.split("\n")[0],
                      "git status --porcelain", "--no-build-isolation --no-deps", TEST_COMMAND,
-                     "PYTHONPATH to /workspace/repo/src", "Never push", "close issues/PRs", "GDL v0.2 remains Current", "V2 is a candidate",
+                     "PYTHONPATH to /workspace/repo/src", "Never push", "close issues/PRs", "GDL V2 Current work unit",
+                     "GDL v0.2 remains available intact as the rollback path",
                      "patch_sha256", "contract_sha256", "allowed_paths", "max_changed_files",
                      "Re-read", "GDL_V2_SANDBOX_OK", PATCH_ARTIFACT_PATH, RESULT_ARTIFACT_PATH):
             self.assertIn(text, instruction)
+        self.assertNotIn("V2 is a candidate", instruction)
+        self.assertNotIn("GDL v0.2 remains Current", instruction)
+        self.assertEqual(payload["metadata"]["gate"], "current")
+        self.assertEqual(payload["metadata"]["gdl_version"], "v2")
         self.assertEqual(payload["metadata"]["contract_sha256"], contract.sha256)
+        self.assertIn("GDL V2 Current work unit", payload["agent"]["instructions"])
 
     def test_caller_credentials_and_environment_never_enter_payload(self):
         with patch.dict(os.environ, {"OPENAI_API_KEY": "synthetic-caller-value", "GITHUB_TOKEN": "synthetic-github-value"}):
