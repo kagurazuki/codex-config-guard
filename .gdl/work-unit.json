@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "work_unit": "issue-25-temp-astra",
+  "issue_number": 25,
+  "task_class": "critical",
+  "source_sha": "299b41c084b25d8ced427860658191318404860a",
+  "summary": "Temporarily make Astra high the active routing policy for every GDL V2 task class",
+  "instructions": "Implement Issue #25 exactly. Preserve the existing balanced routing map in code, add a single active-policy selector whose current value activates Astra/high for routine, standard, and critical defaults and model floors, and make switching back to the balanced policy require changing only that selector. While the temporary Astra policy is active, validate_route must reject Luna or Sol for routine/standard instead of silently permitting a downgrade. Update focused router tests plus AGENTS.md and productionization docs to document the temporary policy and the one-line rollback. Preserve every existing V2 credential, trigger, artifact, duplicate/rerun, unknown-outcome, rollback, and no-remote-write safety boundary. Do not release, deploy, publish, or alter secrets.",
+  "allowed_paths": [
+    "src/codex_config_guard/gdl_v2_router.py",
+    "tests/test_gdl_v2_router.py",
+    "AGENTS.md",
+    "docs/gdl-v2-productionization.md"
+  ],
+  "max_changed_files": 4,
+  "test_profile": "unit",
+  "route": {
+    "model": "gpt-6-astra",
+    "reasoning_effort": "high"
+  }
+}
