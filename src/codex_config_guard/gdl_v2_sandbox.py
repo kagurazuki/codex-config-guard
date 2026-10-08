@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -22,6 +22,8 @@ EXPECTED_FINAL_OUTPUT = "GDL_V2_SANDBOX_OK"
 PATCH_ARTIFACT_PATH = "/workspace/outputs/change.patch"
 RESULT_ARTIFACT_PATH = "/workspace/outputs/result.json"
 REQUIRED_ARTIFACT_PATHS = (PATCH_ARTIFACT_PATH, RESULT_ARTIFACT_PATH)
+PROJECT_INSTALL_COMMAND = "python -m pip install -e . --no-build-isolation --no-deps"
+TEST_COMMAND = "python -m unittest discover -s tests -v"
 
 
 def resolve_route(
@@ -49,20 +51,22 @@ Hard boundaries:
 Procedure:
 1. Clone the public repository `{SOURCE_REPOSITORY}` into `/workspace/repo`.
 2. In `/workspace/repo`, verify `git rev-parse HEAD` equals exactly `{SOURCE_SHA}`. If it does not, fail without editing.
-3. Create exactly `{CANARY_PATH}` containing exactly `{CANARY_MARKER}` plus one trailing newline.
-4. Run `python -m unittest discover -s tests -v` from `/workspace/repo`. Treat any nonzero exit as failure.
-5. Verify `git status --porcelain` shows only the expected new file and no other changed/untracked path.
-6. Create `/workspace/outputs`.
-7. Produce `{PATCH_ARTIFACT_PATH}` as a valid unified git-style patch that adds only `{CANARY_PATH}` with the exact marker content. A `git diff --no-index` command is acceptable; handle its expected exit status 1 without treating the diff itself as failure.
-8. Write `{RESULT_ARTIFACT_PATH}` as JSON with exactly these evidence fields:
+3. Prepare the cloned project for its existing tests by running exactly `{PROJECT_INSTALL_COMMAND}`. Hosted setup already supplies the build backend and runtime dependency, so this command must not need runtime package-network access. Treat any nonzero exit as failure.
+4. Verify `git status --porcelain` is still clean after installation. If installation changed or created any repo path, fail without continuing.
+5. Create exactly `{CANARY_PATH}` containing exactly `{CANARY_MARKER}` plus one trailing newline.
+6. Run exactly `{TEST_COMMAND}` from `/workspace/repo`. Treat any nonzero exit as failure.
+7. Verify `git status --porcelain` shows only the expected new file and no other changed/untracked path.
+8. Create `/workspace/outputs`.
+9. Produce `{PATCH_ARTIFACT_PATH}` as a valid unified git-style patch that adds only `{CANARY_PATH}` with the exact marker content. A `git diff --no-index` command is acceptable; handle its expected exit status 1 without treating the diff itself as failure.
+10. Write `{RESULT_ARTIFACT_PATH}` as JSON with exactly these evidence fields:
    - `source_sha`: `{SOURCE_SHA}`
    - `changed_path`: `{CANARY_PATH}`
    - `marker`: `{CANARY_MARKER}`
-   - `test_command`: `python -m unittest discover -s tests -v`
+   - `test_command`: `{TEST_COMMAND}`
    - `test_status`: `pass`
    - `remote_write_attempted`: false
-9. Re-read both output files and verify they match this contract.
-10. Return exactly `{EXPECTED_FINAL_OUTPUT}` and nothing else.
+11. Re-read both output files and verify they match this contract.
+12. Return exactly `{EXPECTED_FINAL_OUTPUT}` and nothing else.
 
 If any required verification fails, do not fabricate PASS evidence and do not return the success marker."""
 
@@ -90,7 +94,7 @@ def build_sandbox_payload(
                 "allowed_domains": ["github.com"],
             },
             "packages": {
-                "python": ["jsonschema>=4.23,<5"],
+                "python": ["hatchling>=1.25", "jsonschema>=4.23,<5"],
                 "npm": [],
                 "system": [],
             },
@@ -318,7 +322,7 @@ def validate_result_text(text: str) -> dict[str, Any]:
         "source_sha": SOURCE_SHA,
         "changed_path": CANARY_PATH,
         "marker": CANARY_MARKER,
-        "test_command": "python -m unittest discover -s tests -v",
+        "test_command": TEST_COMMAND,
         "test_status": "pass",
         "remote_write_attempted": False,
     }
