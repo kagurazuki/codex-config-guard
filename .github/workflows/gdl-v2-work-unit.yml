@@ -1,4 +1,4 @@
-name: GDL V2 Candidate Work Unit
+name: GDL V2 Current Work Unit
 
 on:
   push:
@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  candidate:
+  current:
     # This coarse filter never authorizes execution; the CLI checks the full marker,
     # work unit, branch, source ancestry, committed contract, history, and run attempt.
     if: ${{ startsWith(github.event.head_commit.message, '[gdl-v2-run:') }}
@@ -32,11 +32,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install candidate caller
+      - name: Install Current caller
         run: python -m pip install .
       - name: Dry-run route, contract, and duplicate-trigger gates
         run: python scripts/gdl_v2_work_unit.py .gdl/work-unit.json --check-trigger
-      - name: Dispatch one bounded candidate and verify artifacts
+      - name: Dispatch one bounded Current work unit and verify artifacts
         env:
           OPENAI_API_KEY: ${{ secrets.GDL_V2_OPENAI_API_KEY }}
         run: >-
