@@ -22,18 +22,40 @@ _HUNK = re.compile(r"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: .*)?")
 _NO_NEWLINE = "\\ No newline at end of file"
 
 
+def _is_current_cutover_preparation(contract: WorkUnitContract) -> bool:
+    """Allow exactly one reviewed transition work unit to prepare the Current patch.
+
+    This is a temporary caller-side authority bridge. It does not make V2 Current,
+    grant GitHub credentials to Codex, or authorize remote mutation from the sandbox.
+    """
+    return (
+        contract.work_unit == "issue-22-current-cutover-r3"
+        and contract.issue_number == 22
+        and contract.task_class == "critical"
+        and contract.route.model == "gpt-6-astra"
+        and contract.route.reasoning_effort == "high"
+    )
+
+
 def build_work_unit_instruction(contract: WorkUnitContract) -> str:
     contract = validate_contract_data(contract.as_dict())
     command = " ".join(TEST_PROFILES[contract.test_profile])
     metadata = expected_result(contract, [], "<SHA-256 of exact change.patch bytes>")
-    return f"""Implement this GDL V2 candidate work unit in the OpenAI-hosted sandbox.
+    if _is_current_cutover_preparation(contract):
+        authority = """Implement this bounded GDL V2 Current-cutover preparation work unit in the OpenAI-hosted sandbox.
+Promotion Gate #20 is PROMOTION_READY. Repository AGENTS.md and canonical Issue #22 explicitly authorize this exact work unit to prepare the final Current-state patch after the user's separate cutover authorization.
+This sandbox may prepare only the bounded patch. V2 becomes Current only after the caller independently verifies the artifacts, performs controlled GitHub write-back, obtains exact-head CI and a fresh cutover audit, and merges the exact audited head to main. GDL v0.2 must remain preserved as the rollback path after cutover.
+"""
+    else:
+        authority = """Implement this GDL V2 candidate work unit in the OpenAI-hosted sandbox.
 GDL v0.2 remains Current. V2 is a candidate; no cutover is authorized.
-
+"""
+    return f"""{authority}
 Hard boundaries override any conflicting task detail:
 - Never use or request credentials. No GitHub credential is provided.
 - Never push, commit, open/update a PR, merge, close issues/PRs, release, deploy,
   enable auto-merge, write directly to main, or alter any remote state.
-- Never expose secrets, disable GDL v0.2, weaken route guards or safety boundaries,
+- Never expose secrets, disable or delete GDL v0.2, weaken route guards or safety boundaries,
   or use consumer UI automation, cookies, private endpoints, or fallback routes.
 - Edit only allowed_paths, at most max_changed_files. A trailing / is a directory
   prefix; other scopes are exact files. No traversal, .git, or symlink traversal.
@@ -78,23 +100,30 @@ Execution procedure:
 def build_work_unit_payload(contract: WorkUnitContract) -> dict[str, Any]:
     contract = validate_contract_data(contract.as_dict())
     route = contract.route
+    cutover_preparation = _is_current_cutover_preparation(contract)
     # Reuse the proven hosted environment and route guard; never copy caller env.
     environment = build_sandbox_payload(
         contract.task_class, route.model, route.reasoning_effort,
     )["environment"]
+    agent_instruction = (
+        "Prepare the bounded GDL V2 Current-cutover patch exactly. Use direct shell and test evidence. "
+        "Issue #22 and repository instructions authorize patch preparation only; Current activation and GitHub writes remain caller-side. "
+        "Hard boundaries override task details. Never use credentials or mutate remote systems."
+        if cutover_preparation else
+        "Implement the bounded V2 candidate exactly. Use direct shell and test evidence. "
+        "Hard boundaries override task details. Never use credentials or mutate remote systems."
+    )
     return {
         "agent": {
             "model": route.model,
             "reasoning": {"effort": route.reasoning_effort},
-            "instructions": (
-                "Implement the bounded V2 candidate exactly. Use direct shell and test evidence. "
-                "Hard boundaries override task details. Never use credentials or mutate remote systems."
-            ),
+            "instructions": agent_instruction,
         },
         "environment": environment,
         "input": build_work_unit_instruction(contract),
         "metadata": {
-            "gdl_version": "v2", "gate": "productionization_candidate",
+            "gdl_version": "v2",
+            "gate": "current_cutover_preparation" if cutover_preparation else "productionization_candidate",
             "work_unit": contract.work_unit, "issue_number": str(contract.issue_number),
             "task_class": route.task_class, "source_sha": contract.source_sha,
             "contract_sha256": contract.sha256,
