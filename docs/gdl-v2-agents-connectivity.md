@@ -1,6 +1,6 @@
 # GDL V2 Phase 1 — Agents API connectivity canary
 
-Status: **CANDIDATE / RESTRICTED KEY CONFIGURED / SESSION-CREATE LIVE PASS / ROOT-TURN COMPLETION VALIDATION IN PROGRESS**
+Status: **PHASE 1 PASS / MANAGED CODEX ROOT-TURN CONNECTIVITY VERIFIED / NO REPOSITORY WRITE CAPABILITY**
 
 Linked work unit: GitHub Issue #5. Depends on Phase 0 Draft PR #4.
 
@@ -12,7 +12,7 @@ This phase deliberately does **not** give the managed agent a repository filesys
 
 ## Required OpenAI application-key permissions
 
-The current Agents API quickstart requires a project application API key with:
+The Agents API application key is restricted to the required session/inference permissions:
 
 - `api.agents.read`
 - `api.agents.write`
@@ -85,13 +85,22 @@ The branch-scoped workflow runs only on `gdl-v2-agents-connectivity-canary`.
 - Workflow permission is `contents: read` only.
 - No merge, release, deploy, or repository-write path exists in this phase.
 
-## Evidence so far
+## Verified evidence
 
-- Initial ordinary-push guard canary: PASS; paid connectivity step skipped as designed.
-- First explicit live marker run: Agents API session creation/connectivity job PASS, proving the restricted GitHub secret and selected route can reach the managed API.
-- That first live implementation only checked session-creation response metadata, so it is not sufficient for Phase 1 completion.
-- Current change strengthens the live path to stream and verify the root turn and exact output before PASS.
+Completion-aware implementation CI run `37782130880` / #82 passed on Python 3.11, 3.12, and 3.13.
 
-## Current stop boundary
+Completion-verified live run `37782192796` on head `a83021127a39cbc014d08434475804951f1a0a60` passed with:
 
-Do not add GitHub/repository write capability in Phase 1. After a completion-verified live canary and green CI, Phase 1 may be marked PASS. Phase 2 must design a separately bounded code-change transport before any managed agent receives repository-write capability.
+- session `sess_0863c517b99af96d006ac7962e21e8819c9f1f8181452a2d19`
+- root turn `turn_0863c517b99af96d006ac79632018c819ca2745873db93474c`
+- root turn status `completed`
+- exact output `GDL_V2_CONNECTIVITY_OK`
+- `verified_output: true`
+
+The GitHub Actions log kept `OPENAI_API_KEY` masked and exposed only `contents: read` plus metadata-read permissions for the workflow token.
+
+## Phase 1 verdict and boundary
+
+**PHASE 1 PASS.** Managed Codex can be launched through the Agents API with the explicit V2 route and its root-turn outcome can be verified deterministically.
+
+Phase 1 still grants no repository-write capability. Phase 2 must separately validate an OpenAI-hosted sandbox that produces bounded patch/test artifacts before any write-back path is considered. GDL v0.2 remains Current until later V2 promotion gates pass.
