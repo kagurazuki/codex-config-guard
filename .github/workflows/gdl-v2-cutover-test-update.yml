@@ -1,0 +1,65 @@
+name: GDL V2 Cutover Test Update
+
+on:
+  push:
+    branches:
+      - gdl-v2-cutover-control
+
+permissions:
+  contents: write
+
+jobs:
+  update-cutover-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gdl-v2-current-cutover
+          fetch-depth: 0
+      - name: Require exact bounded cutover head
+        run: test "$(git rev-parse HEAD)" = "2ebfbfae94bd311faad8fffe356662f48c3176ab"
+      - name: Update Current-state assertions only
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("tests/test_gdl_v2_production.py")
+          text = path.read_text(encoding="utf-8")
+
+          old = '''                     "PYTHONPATH to /workspace/repo/src", "Never push", "close issues/PRs", "GDL v0.2 remains Current", "V2 is a candidate",
+                     "patch_sha256", "contract_sha256", "allowed_paths", "max_changed_files",
+                     "Re-read", "GDL_V2_SANDBOX_OK", PATCH_ARTIFACT_PATH, RESULT_ARTIFACT_PATH):
+            self.assertIn(text, instruction)
+        self.assertEqual(payload["metadata"]["contract_sha256"], contract.sha256)
+'''
+          new = '''                     "PYTHONPATH to /workspace/repo/src", "Never push", "close issues/PRs", "GDL V2 Current work unit",
+                     "GDL v0.2 remains available intact as the rollback path",
+                     "patch_sha256", "contract_sha256", "allowed_paths", "max_changed_files",
+                     "Re-read", "GDL_V2_SANDBOX_OK", PATCH_ARTIFACT_PATH, RESULT_ARTIFACT_PATH):
+            self.assertIn(text, instruction)
+        self.assertNotIn("V2 is a candidate", instruction)
+        self.assertNotIn("GDL v0.2 remains Current", instruction)
+        self.assertEqual(payload["metadata"]["gate"], "current")
+        self.assertEqual(payload["metadata"]["gdl_version"], "v2")
+        self.assertEqual(payload["metadata"]["contract_sha256"], contract.sha256)
+        self.assertIn("GDL V2 Current work unit", payload["agent"]["instructions"])
+'''
+          if text.count(old) != 1:
+              raise SystemExit("expected assertion block not found exactly once")
+          text = text.replace(old, new)
+          path.write_text(text, encoding="utf-8")
+          PY
+      - name: Verify one-file boundary and tests
+        run: |
+          test "$(git diff --name-only)" = "tests/test_gdl_v2_production.py"
+          git diff --check
+          python -m pip install .
+          python -m unittest discover -s tests -v
+      - name: Commit bounded test update
+        run: |
+          git config user.name "kagurazuki"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- tests/test_gdl_v2_production.py
+          git commit -m "cutover: assert GDL V2 Current payload semantics"
+          git push origin HEAD:gdl-v2-current-cutover
