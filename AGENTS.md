@@ -38,11 +38,18 @@ recovery is historical cutover evidence, not a general alternative execution pat
 
 - The orchestrator must choose an explicit route. Never silently rely on an unspecified/default model for a V2 task.
 - Validate the route with `codex_config_guard.gdl_v2_router` before execution wiring uses it.
-- Minimum Current routes are:
+- **Temporary active policy:** `ACTIVE_ROUTE_POLICY = "astra-high-temporary"`.
+  While this selector is active, routine, standard, and critical work all default to
+  and are floored at `gpt-6-astra` with `high` reasoning. Luna and Sol requests for
+  routine/standard work must fail validation rather than silently downgrade.
+- The prior balanced policy remains intact in code:
   - routine/focused: `gpt-6-luna` with `max`
   - standard coding/professional: `gpt-6.1-sol` with `high`
   - hardest/high-impact: `gpt-6-astra` with `high`
-- Upward escalation is allowed when needed for first-pass success; silent downgrade below the task-class floor is not.
+- To return to the prior balanced behavior, change only `ACTIVE_ROUTE_POLICY` in
+  `src/codex_config_guard/gdl_v2_router.py` from `"astra-high-temporary"` to
+  `"balanced"`. Do not reconstruct or edit the preserved balanced mapping.
+- Upward escalation remains allowed when needed for first-pass success; silent downgrade below the active task-class floor is not.
 
 ## Editing and tests
 
