@@ -188,7 +188,11 @@ class SandboxTurnTests(unittest.TestCase):
     def test_missing_output_indices_fail_closed(self):
         events = [
             {"type": "agent.session.created", "session": {"id": "sess_bad"}},
-            {"type": "agent.session.turn.output_text.done", "text": EXPECTED_FINAL_OUTPUT},
+            {
+                "type": "agent.session.turn.output_text.done",
+                "item_id": "msg_bad",
+                "text": EXPECTED_FINAL_OUTPUT,
+            },
         ]
         with self.assertRaisesRegex(RuntimeError, "invalid output/content index"):
             self._run(events)
