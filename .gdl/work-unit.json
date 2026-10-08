@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "work_unit": "issue-22-current-cutover-r3",
+  "issue_number": 22,
+  "task_class": "critical",
+  "source_sha": "af361a3053a081a700fe24f52a3899a40e825202",
+  "summary": "Finalize GDL V2 as the durable Current work-unit surface while preserving GDL v0.2 as rollback and every proven safety boundary",
+  "instructions": "Implement the final bounded Current-cutover patch authorized by Issue #22. Promotion Gate #20 returned PROMOTION_READY, the user separately authorized cutover/merge, repository AGENTS.md explicitly authorizes this exact preparation, and the caller contains a narrowly scoped transition route for work_unit issue-22-current-cutover-r3. Produce the durable post-merge repository state: generic GDL V2 work units are Current; GDL v0.2 remains intact as the rollback path, not Current. Replace transitional/candidate operational wording in AGENTS.md, docs/gdl-v2-productionization.md, the generic workflow name/comments, CLI description, and managed work-unit payload/metadata. Preserve historical canary/candidate facts only when clearly labeled historical. Remove the temporary one-work-unit cutover exception from gdl_v2_production.py in the final patch so normal Current operation has no lingering transition bypass. The durable Current payload must tell Codex it is executing a bounded GDL V2 Current work unit while retaining all non-mutation and credential boundaries. Use stable Current metadata instead of productionization_candidate/current_cutover_preparation. Update tests to positively assert Current semantics and ensure caller credentials/environment never enter the payload. Preserve explicit model/reasoning route validation, no silent downgrade, exact source binding, bounded allowed paths and changed-file counts, allowlisted tests, deterministic branch/marker, duplicate/rerun fail-closed, dispatch receipt and unknown-outcome reconciliation, read-only GitHub workflow permissions, persist-credentials false, caller-only OpenAI key outside sandbox input, no Codex GitHub credential, restricted hosted sandbox, full patch/result/digest verification, separate caller-controlled GitHub write-back, and no direct-to-main Codex path. Do not release, deploy, publish, close, push, commit, open/update PRs, merge, or mutate any remote system from Codex. Run the full unit profile and return the fixed success marker only after re-reading and verifying artifacts.",
+  "allowed_paths": [
+    "AGENTS.md",
+    "docs/gdl-v2-productionization.md",
+    ".github/workflows/gdl-v2-work-unit.yml",
+    "scripts/gdl_v2_work_unit.py",
+    "src/codex_config_guard/gdl_v2_production.py",
+    "tests/test_gdl_v2_production.py"
+  ],
+  "max_changed_files": 6,
+  "test_profile": "unit",
+  "route": {
+    "model": "gpt-6-astra",
+    "reasoning_effort": "high"
+  }
+}
