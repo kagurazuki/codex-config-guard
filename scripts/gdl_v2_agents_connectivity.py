@@ -7,8 +7,8 @@ import sys
 from codex_config_guard.gdl_v2_agents import (
     AGENTS_API_SESSIONS_URL,
     build_connectivity_payload,
-    create_connectivity_session,
     require_api_key,
+    run_connectivity_canary,
 )
 
 
@@ -26,7 +26,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--live",
         action="store_true",
-        help="Actually call the Agents API. Without this flag the command is dry-run only.",
+        help=(
+            "Actually stream and verify one Agents API root turn. "
+            "Without this flag the command is dry-run only."
+        ),
     )
     return parser
 
@@ -59,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         api_key = require_api_key()
-        result = create_connectivity_session(payload, api_key)
+        result = run_connectivity_canary(payload, api_key)
         print(json.dumps({"mode": "live", **result}, indent=2, sort_keys=True))
         return 0
     except (RuntimeError, ValueError) as exc:
