@@ -1,4 +1,4 @@
-"""Managed execution and independent artifact verification for V2 candidates."""
+"""Managed execution and independent artifact verification for GDL V2 Current work units."""
 from __future__ import annotations
 
 import hashlib
@@ -26,14 +26,14 @@ def build_work_unit_instruction(contract: WorkUnitContract) -> str:
     contract = validate_contract_data(contract.as_dict())
     command = " ".join(TEST_PROFILES[contract.test_profile])
     metadata = expected_result(contract, [], "<SHA-256 of exact change.patch bytes>")
-    return f"""Implement this GDL V2 candidate work unit in the OpenAI-hosted sandbox.
-GDL v0.2 remains Current. V2 is a candidate; no cutover is authorized.
+    return f"""Implement this bounded GDL V2 Current work unit in the OpenAI-hosted sandbox.
+GDL V2 is the Current execution surface. GDL v0.2 remains available intact as the rollback path.
 
 Hard boundaries override any conflicting task detail:
 - Never use or request credentials. No GitHub credential is provided.
 - Never push, commit, open/update a PR, merge, close issues/PRs, release, deploy,
   enable auto-merge, write directly to main, or alter any remote state.
-- Never expose secrets, disable GDL v0.2, weaken route guards or safety boundaries,
+- Never expose secrets, disable or delete the GDL v0.2 rollback path, weaken route guards or safety boundaries,
   or use consumer UI automation, cookies, private endpoints, or fallback routes.
 - Edit only allowed_paths, at most max_changed_files. A trailing / is a directory
   prefix; other scopes are exact files. No traversal, .git, or symlink traversal.
@@ -87,14 +87,14 @@ def build_work_unit_payload(contract: WorkUnitContract) -> dict[str, Any]:
             "model": route.model,
             "reasoning": {"effort": route.reasoning_effort},
             "instructions": (
-                "Implement the bounded V2 candidate exactly. Use direct shell and test evidence. "
+                "Implement the bounded GDL V2 Current work unit exactly. Use direct shell and test evidence. "
                 "Hard boundaries override task details. Never use credentials or mutate remote systems."
             ),
         },
         "environment": environment,
         "input": build_work_unit_instruction(contract),
         "metadata": {
-            "gdl_version": "v2", "gate": "productionization_candidate",
+            "gdl_version": "v2", "gate": "current",
             "work_unit": contract.work_unit, "issue_number": str(contract.issue_number),
             "task_class": route.task_class, "source_sha": contract.source_sha,
             "contract_sha256": contract.sha256,
