@@ -5,6 +5,7 @@ from typing import Final, Literal
 
 TaskClass = Literal["routine", "standard", "critical"]
 ReasoningEffort = Literal["none", "low", "medium", "high", "xhigh", "max"]
+RoutingPolicy = Literal["balanced", "astra-high-temporary"]
 
 
 @dataclass(frozen=True)
@@ -38,17 +39,47 @@ MODEL_MIN_EFFORT: Final[dict[str, ReasoningEffort]] = {
     "gpt-6-astra": "high",
 }
 
-TASK_MIN_MODEL: Final[dict[TaskClass, str]] = {
+# Temporary usage-spend preference. Roll back to the prior behavior by changing
+# only this selector to "balanced". The complete balanced policy remains below.
+ACTIVE_ROUTE_POLICY: Final[RoutingPolicy] = "astra-high-temporary"
+
+BALANCED_TASK_MIN_MODEL: Final[dict[TaskClass, str]] = {
     "routine": "gpt-6-luna",
     "standard": "gpt-6.1-sol",
     "critical": "gpt-6-astra",
 }
 
-DEFAULT_ROUTES: Final[dict[TaskClass, ModelRoute]] = {
+ASTRA_HIGH_TASK_MIN_MODEL: Final[dict[TaskClass, str]] = {
+    "routine": "gpt-6-astra",
+    "standard": "gpt-6-astra",
+    "critical": "gpt-6-astra",
+}
+
+TASK_MIN_MODEL_BY_POLICY: Final[dict[RoutingPolicy, dict[TaskClass, str]]] = {
+    "balanced": BALANCED_TASK_MIN_MODEL,
+    "astra-high-temporary": ASTRA_HIGH_TASK_MIN_MODEL,
+}
+
+BALANCED_DEFAULT_ROUTES: Final[dict[TaskClass, ModelRoute]] = {
     "routine": ModelRoute("gpt-6-luna", "max", "routine"),
     "standard": ModelRoute("gpt-6.1-sol", "high", "standard"),
     "critical": ModelRoute("gpt-6-astra", "high", "critical"),
 }
+
+ASTRA_HIGH_DEFAULT_ROUTES: Final[dict[TaskClass, ModelRoute]] = {
+    "routine": ModelRoute("gpt-6-astra", "high", "routine"),
+    "standard": ModelRoute("gpt-6-astra", "high", "standard"),
+    "critical": ModelRoute("gpt-6-astra", "high", "critical"),
+}
+
+DEFAULT_ROUTES_BY_POLICY: Final[dict[RoutingPolicy, dict[TaskClass, ModelRoute]]] = {
+    "balanced": BALANCED_DEFAULT_ROUTES,
+    "astra-high-temporary": ASTRA_HIGH_DEFAULT_ROUTES,
+}
+
+# Keep these public compatibility names bound to the active policy.
+TASK_MIN_MODEL: Final[dict[TaskClass, str]] = TASK_MIN_MODEL_BY_POLICY[ACTIVE_ROUTE_POLICY]
+DEFAULT_ROUTES: Final[dict[TaskClass, ModelRoute]] = DEFAULT_ROUTES_BY_POLICY[ACTIVE_ROUTE_POLICY]
 
 
 def select_route(task_class: TaskClass) -> ModelRoute:
@@ -60,11 +91,11 @@ def select_route(task_class: TaskClass) -> ModelRoute:
 
 
 def validate_route(task_class: TaskClass, model: str, reasoning_effort: str) -> ModelRoute:
-    """Validate that a proposed route meets the task and model effort floors.
+    """Validate that a proposed route meets the active policy floors.
 
-    The validator allows capability upgrades, but never silent downgrades below the
-    minimum model for the task class or below the current minimum effort for the
-    chosen model.
+    The active policy may raise a task's model floor above the balanced baseline.
+    Capability upgrades remain allowed, but silent downgrades below the active task
+    floor or below the chosen model's reasoning floor are rejected.
     """
     if task_class not in TASK_MIN_MODEL:
         raise ValueError(f"unsupported task class: {task_class!r}")
