@@ -5,7 +5,7 @@ from typing import Final, Literal
 
 TaskClass = Literal["routine", "standard", "critical"]
 ReasoningEffort = Literal["none", "low", "medium", "high", "xhigh", "max"]
-RoutingPolicy = Literal["balanced", "astra-high-temporary"]
+CurrentRoutingPolicy = Literal["balanced", "astra-high-temporary"]
 
 
 @dataclass(frozen=True)
@@ -39,51 +39,49 @@ MODEL_MIN_EFFORT: Final[dict[str, ReasoningEffort]] = {
     "gpt-6-astra": "high",
 }
 
-# Temporary usage-spend preference. Roll back to the prior behavior by changing
-# only this selector to "balanced". The complete balanced policy remains below.
-ACTIVE_ROUTE_POLICY: Final[RoutingPolicy] = "astra-high-temporary"
-
-BALANCED_TASK_MIN_MODEL: Final[dict[TaskClass, str]] = {
+# Historical/canary baseline remains balanced so Phase 0-4 evidence and helpers keep
+# their original semantics.
+TASK_MIN_MODEL: Final[dict[TaskClass, str]] = {
     "routine": "gpt-6-luna",
     "standard": "gpt-6.1-sol",
     "critical": "gpt-6-astra",
 }
 
-ASTRA_HIGH_TASK_MIN_MODEL: Final[dict[TaskClass, str]] = {
-    "routine": "gpt-6-astra",
-    "standard": "gpt-6-astra",
-    "critical": "gpt-6-astra",
-}
-
-TASK_MIN_MODEL_BY_POLICY: Final[dict[RoutingPolicy, dict[TaskClass, str]]] = {
-    "balanced": BALANCED_TASK_MIN_MODEL,
-    "astra-high-temporary": ASTRA_HIGH_TASK_MIN_MODEL,
-}
-
-BALANCED_DEFAULT_ROUTES: Final[dict[TaskClass, ModelRoute]] = {
+DEFAULT_ROUTES: Final[dict[TaskClass, ModelRoute]] = {
     "routine": ModelRoute("gpt-6-luna", "max", "routine"),
     "standard": ModelRoute("gpt-6.1-sol", "high", "standard"),
     "critical": ModelRoute("gpt-6-astra", "high", "critical"),
 }
 
-ASTRA_HIGH_DEFAULT_ROUTES: Final[dict[TaskClass, ModelRoute]] = {
-    "routine": ModelRoute("gpt-6-astra", "high", "routine"),
-    "standard": ModelRoute("gpt-6-astra", "high", "standard"),
-    "critical": ModelRoute("gpt-6-astra", "high", "critical"),
+# Temporary Current-work-unit preference. Restore the prior Current behavior by
+# changing only this selector to "balanced".
+ACTIVE_CURRENT_ROUTE_POLICY: Final[CurrentRoutingPolicy] = "astra-high-temporary"
+
+CURRENT_TASK_MIN_MODEL_BY_POLICY: Final[
+    dict[CurrentRoutingPolicy, dict[TaskClass, str]]
+] = {
+    "balanced": TASK_MIN_MODEL,
+    "astra-high-temporary": {
+        "routine": "gpt-6-astra",
+        "standard": "gpt-6-astra",
+        "critical": "gpt-6-astra",
+    },
 }
 
-DEFAULT_ROUTES_BY_POLICY: Final[dict[RoutingPolicy, dict[TaskClass, ModelRoute]]] = {
-    "balanced": BALANCED_DEFAULT_ROUTES,
-    "astra-high-temporary": ASTRA_HIGH_DEFAULT_ROUTES,
+CURRENT_DEFAULT_ROUTES_BY_POLICY: Final[
+    dict[CurrentRoutingPolicy, dict[TaskClass, ModelRoute]]
+] = {
+    "balanced": DEFAULT_ROUTES,
+    "astra-high-temporary": {
+        "routine": ModelRoute("gpt-6-astra", "high", "routine"),
+        "standard": ModelRoute("gpt-6-astra", "high", "standard"),
+        "critical": ModelRoute("gpt-6-astra", "high", "critical"),
+    },
 }
-
-# Keep these public compatibility names bound to the active policy.
-TASK_MIN_MODEL: Final[dict[TaskClass, str]] = TASK_MIN_MODEL_BY_POLICY[ACTIVE_ROUTE_POLICY]
-DEFAULT_ROUTES: Final[dict[TaskClass, ModelRoute]] = DEFAULT_ROUTES_BY_POLICY[ACTIVE_ROUTE_POLICY]
 
 
 def select_route(task_class: TaskClass) -> ModelRoute:
-    """Return the deterministic default route for a V2 task class."""
+    """Return the balanced historical/canary default route."""
     try:
         return DEFAULT_ROUTES[task_class]
     except KeyError as exc:
@@ -91,12 +89,7 @@ def select_route(task_class: TaskClass) -> ModelRoute:
 
 
 def validate_route(task_class: TaskClass, model: str, reasoning_effort: str) -> ModelRoute:
-    """Validate that a proposed route meets the active policy floors.
-
-    The active policy may raise a task's model floor above the balanced baseline.
-    Capability upgrades remain allowed, but silent downgrades below the active task
-    floor or below the chosen model's reasoning floor are rejected.
-    """
+    """Validate a route against the balanced historical/canary floors."""
     if task_class not in TASK_MIN_MODEL:
         raise ValueError(f"unsupported task class: {task_class!r}")
     if model not in MODEL_CAPABILITY_ORDER:
@@ -118,3 +111,25 @@ def validate_route(task_class: TaskClass, model: str, reasoning_effort: str) -> 
         )
 
     return ModelRoute(model, reasoning_effort, task_class)
+
+
+def select_current_route(task_class: TaskClass) -> ModelRoute:
+    """Return the default route for a generic GDL V2 Current work unit."""
+    try:
+        return CURRENT_DEFAULT_ROUTES_BY_POLICY[ACTIVE_CURRENT_ROUTE_POLICY][task_class]
+    except KeyError as exc:
+        raise ValueError(f"unsupported task class: {task_class!r}") from exc
+
+
+def validate_current_route(
+    task_class: TaskClass, model: str, reasoning_effort: str,
+) -> ModelRoute:
+    """Validate an explicit generic Current route against the active policy floor."""
+    route = validate_route(task_class, model, reasoning_effort)
+    minimum_model = CURRENT_TASK_MIN_MODEL_BY_POLICY[ACTIVE_CURRENT_ROUTE_POLICY][task_class]
+    if MODEL_CAPABILITY_ORDER[route.model] < MODEL_CAPABILITY_ORDER[minimum_model]:
+        raise ValueError(
+            f"route below Current model floor for {task_class}: "
+            f"{route.model} < {minimum_model}"
+        )
+    return route
