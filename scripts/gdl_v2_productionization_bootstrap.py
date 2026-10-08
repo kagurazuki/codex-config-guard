@@ -83,7 +83,7 @@ If any verification fails, do not fabricate PASS evidence and do not return the 
         "metadata": {
             "gdl_version": "v2",
             "gate": "productionization_bootstrap",
-            "issue_number": 16,
+            "issue_number": "16",
             "task_class": "standard",
             "source_sha": SOURCE_SHA,
         },
