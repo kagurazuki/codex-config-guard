@@ -16,7 +16,8 @@ These instructions apply to the entire repository while working on the GDL V2 ca
 - Do not disable or delete the current GDL v0.2 / legacy path.
 - Do not expose, print, commit, or request secret values.
 - Do not use consumer-UI automation, session cookies, hidden/private endpoints, or undocumented fallback paths.
-- Live Agents API execution is disabled for this Phase 0 canary unless the task explicitly states that the credential/runtime boundary has already been validated and authorizes that exact execution.
+- Live Agents API execution is allowed only when the current phase Issue explicitly authorizes the exact bounded canary, the workflow requires an explicit live marker, and the API key remains outside source and sandbox input.
+- Codex must not receive GitHub write credentials. Remote GitHub write-back is a separate ChatGPT/GitHub caller action after independent artifact verification.
 
 ## Model routing
 
@@ -37,6 +38,6 @@ These instructions apply to the entire repository while working on the GDL V2 ca
 - Record actual commands and results in the Draft PR.
 - If a required test cannot run, state exactly what is unverified instead of claiming PASS.
 
-## Stop condition
+## Phase 4 stop condition
 
-For Phase 0, stop when the architecture/spec, deterministic route guard, tests, and Draft PR evidence are complete. Do not cross into live Agents API execution or production promotion.
+For Issue #11, stop only after the contract-driven managed-Codex turn, independent artifact verification, controlled caller-side write-back, Draft PR, exact-head CI, and head-bound audit have all passed. Stop before merge, release, deploy, issue/PR closure, or promotion of GDL V2 to Current.
