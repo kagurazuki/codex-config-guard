@@ -1,0 +1,52 @@
+name: GDL V2 Candidate Work Unit
+
+on:
+  push:
+    branches:
+      - 'gdl-v2/work/*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gdl-v2-work-unit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    # This coarse filter never authorizes execution; the CLI checks the full marker,
+    # work unit, branch, source ancestry, committed contract, history, and run attempt.
+    if: ${{ startsWith(github.event.head_commit.message, '[gdl-v2-run:') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require original event head
+        env:
+          EVENT_HEAD: ${{ github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EVENT_HEAD"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install candidate caller
+        run: python -m pip install .
+      - name: Dry-run route, contract, and duplicate-trigger gates
+        run: python scripts/gdl_v2_work_unit.py .gdl/work-unit.json --check-trigger
+      - name: Dispatch one bounded candidate and verify artifacts
+        env:
+          OPENAI_API_KEY: ${{ secrets.GDL_V2_OPENAI_API_KEY }}
+        run: >-
+          python scripts/gdl_v2_work_unit.py .gdl/work-unit.json
+          --output-dir "$RUNNER_TEMP/gdl-v2-work-unit" --live
+      - name: Preserve verification and unknown-outcome evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: gdl-v2-work-unit-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/gdl-v2-work-unit/
+          if-no-files-found: warn
+          retention-days: 14
