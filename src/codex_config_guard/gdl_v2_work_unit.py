@@ -10,8 +10,9 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
-from .gdl_v2_agents import resolve_route
-from .gdl_v2_router import ModelRoute, TaskClass
+from .gdl_v2_router import (
+    ModelRoute, TaskClass, select_current_route, validate_current_route,
+)
 
 SCHEMA_VERSION = 1
 CONTRACT_PATH = ".gdl/work-unit.json"
@@ -147,9 +148,9 @@ def validate_contract_data(data: Any) -> WorkUnitContract:
             raise ValueError("invalid route request")
         if any(not isinstance(v, str) for v in route_data.values()):
             raise ValueError("invalid route request")
-        route = resolve_route(task_class, **route_data)
+        route = validate_current_route(task_class, **route_data)
     else:
-        route = resolve_route(task_class)
+        route = select_current_route(task_class)
     contract = WorkUnitContract(
         SCHEMA_VERSION, work_unit, data["issue_number"], task_class, data["source_sha"],
         summary, instructions, tuple(scopes), data["max_changed_files"], profile, route,
