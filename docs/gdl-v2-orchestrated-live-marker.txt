@@ -1,0 +1,3 @@
+GDL V2 Phase 4 live handoff marker.
+This commit authorizes exactly one bounded managed-Codex run for Issue #11.
+No GitHub credential is supplied to Codex. No merge, release, deploy, or production cutover is authorized.
