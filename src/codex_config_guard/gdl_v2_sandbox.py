@@ -22,7 +22,7 @@ EXPECTED_FINAL_OUTPUT = "GDL_V2_SANDBOX_OK"
 PATCH_ARTIFACT_PATH = "/workspace/outputs/change.patch"
 RESULT_ARTIFACT_PATH = "/workspace/outputs/result.json"
 REQUIRED_ARTIFACT_PATHS = (PATCH_ARTIFACT_PATH, RESULT_ARTIFACT_PATH)
-PROJECT_INSTALL_COMMAND = "python -m pip install -e . --no-build-isolation --no-deps"
+PROJECT_INSTALL_COMMAND = "python -m pip install . --no-build-isolation --no-deps"
 TEST_COMMAND = "python -m unittest discover -s tests -v"
 
 
