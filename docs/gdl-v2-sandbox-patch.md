@@ -1,6 +1,6 @@
 # GDL V2 Phase 2 — managed sandbox patch-artifact canary
 
-Status: **CANDIDATE / PREPARED / LIVE SANDBOX CANARY NOT YET RUN**
+Status: **PHASE 2 PASS / MANAGED SANDBOX PATCH+TEST ARTIFACTS VERIFIED / CODEX HAS NO GITHUB WRITE CREDENTIAL**
 
 Linked work unit: GitHub Issue #7. Depends on Phase 1 Issue #5 / Draft PR #6 PASS.
 
@@ -33,17 +33,16 @@ A model completion message is not sufficient evidence. PASS requires caller-side
 
 ## OpenAI-hosted environment boundary
 
-The canary uses:
+The verified canary uses:
 
 - `environment.type=openai_hosted`
 - `container_size=small`
 - `network.access=restricted`
-- initial runtime allowlist: `github.com` only
-- hosted Python package setup for the repository's existing `jsonschema>=4.23,<5` dependency
+- runtime allowlist: `github.com` only
+- hosted Python package setup for `hatchling>=1.25` and `jsonschema>=4.23,<5`
+- normal local project installation with `python -m pip install . --no-build-isolation --no-deps`
 
 No GitHub token, GitHub App credential, vault credential, deployment credential, or other third-party secret is supplied to the sandbox.
-
-OpenAI's Agents API documentation states that an `openai_hosted` sandbox provides a Linux workspace, supports restricted network host allowlists, and publishes files under `/workspace/outputs` as immutable session artifacts when a turn completes.
 
 Official references:
 - https://developers.openai.com/api/docs/guides/agents-api/environments/openai-hosted
@@ -65,20 +64,47 @@ The caller rejects:
 - any result claiming `remote_write_attempted: true`;
 - malformed JSON or incomplete evidence.
 
-Verified local copies are then preserved as a short-retention GitHub Actions artifact for audit.
+Verified local copies are preserved as a short-retention GitHub Actions artifact for audit.
 
-## GitHub Actions gate
+## Verified live evidence
 
-Workflow: `.github/workflows/gdl-v2-sandbox-patch.yml`
+Final live head: `d767201f58e10b741860d907c5696bd3cbeeb584`
 
-- branch-scoped to `gdl-v2-sandbox-patch-canary`;
-- GitHub token permission is `contents: read` only;
-- ordinary pushes run only the guard job;
-- paid hosted-sandbox execution requires exact commit marker `[gdl-v2-sandbox-live]`;
-- no push, PR creation/update, merge, release, deploy, or production cutover exists in this phase.
+GitHub Actions run `37786369894` completed successfully:
 
-## Promotion boundary
+- guard job: PASS
+- hosted sandbox job: PASS
+- session: `sess_07104de971deb74e006ac79da3471881a3bbb1527da5f37e74`
+- root turn: `turn_07104de971deb74e006ac79da9210881a3927e4db8559e40ed`
+- root turn status: `completed`
+- exact final output: `GDL_V2_SANDBOX_OK`
+- source SHA: `b6d18dffcfad5016f2f21ee760372a2cf0ab2bdc`
+- changed path: `docs/gdl-v2-managed-agent-canary.txt`
+- test status: `pass`
+- `patch_verified: true`
+- `result_verified: true`
 
-Phase 2 may be marked PASS only after green repository CI and one bounded live sandbox run whose published artifacts pass caller-side verification.
+GitHub Actions evidence artifact:
 
-Even after Phase 2 PASS, the generated patch must **not** be written back to GitHub automatically in this phase. A controlled write-back path is a separate Phase 3 boundary. GDL v0.2 remains Current until later V2 promotion gates pass.
+- name: `gdl-v2-sandbox-patch-evidence`
+- ID: `11554472587`
+- digest: `sha256:3a63c7a51b89ca64017e162d32258ddfc278718da3a3a9ea9a7f94f9075f8347`
+- contents: exactly `change.patch` and `result.json`
+
+The downloaded ZIP was re-read independently. `change.patch` adds only the expected marker file, and `result.json` matches the exact source/path/marker/test/no-remote-write contract.
+
+## Retained failure evidence
+
+Phase 2 attempts 1-3 remain recorded in Issue #7. They exposed, in order:
+
+1. the cloned package had not been installed before tests;
+2. editable installation introduced an unnecessary `editables` dependency;
+3. the caller incorrectly concatenated progress output items with the final Agents output item.
+
+Each defect was repaired without widening GitHub credentials or runtime network access.
+
+## Phase 2 verdict and next boundary
+
+**PHASE 2 PASS.** Managed Codex can produce a bounded tested patch artifact in an OpenAI-hosted sandbox, and the caller can independently verify that evidence while Codex has no GitHub write credential.
+
+The generated patch is still **not** written back to GitHub automatically in Phase 2. Phase 3 is the separate controlled-write boundary: the ChatGPT/GitHub side may apply an already verified bounded patch to a dedicated branch, create a Draft PR, run CI, and audit the resulting head. Merge/release/deploy remain outside that authority. GDL v0.2 remains Current until later V2 promotion gates pass.
