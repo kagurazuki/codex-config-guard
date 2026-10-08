@@ -131,6 +131,11 @@ def validate_contract_data(data: Any) -> WorkUnitContract:
         validate_path(scope, scope=True)
     if len(set(scopes)) != len(scopes):
         raise ValueError("duplicate allowed_paths")
+    for directory in scopes:
+        if directory.endswith("/") and any(
+            scope != directory and scope.startswith(directory) for scope in scopes
+        ):
+            raise ValueError("overlapping allowed_paths")
     if type(data["max_changed_files"]) is not int or not 1 <= data["max_changed_files"] <= 64:
         raise ValueError("invalid max_changed_files")
     profile = data["test_profile"]
