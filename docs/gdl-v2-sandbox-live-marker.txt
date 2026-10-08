@@ -1,3 +1,4 @@
 GDL V2 Phase 2 hosted-sandbox canary marker.
-Retry 2 follows green CI after the bounded environment-preparation repair: install the pinned cloned project locally without runtime package-network access, then run tests and independently verify patch/result artifacts.
+Retry 3 follows green CI after replacing editable installation with a normal local wheel install that uses only hosted build/runtime packages and no runtime package-network access.
+PASS still requires exact pinned source, only the bounded marker-file change, passing unit tests, published patch/result artifacts, and independent caller-side verification.
 No GitHub write credential, repository write-back, merge, release, deploy, or production cutover is authorized.
