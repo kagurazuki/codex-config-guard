@@ -8,8 +8,10 @@ from codex_config_guard.gdl_v2_sandbox import (
     CANARY_PATH,
     EXPECTED_FINAL_OUTPUT,
     PATCH_ARTIFACT_PATH,
+    PROJECT_INSTALL_COMMAND,
     RESULT_ARTIFACT_PATH,
     SOURCE_SHA,
+    TEST_COMMAND,
     build_sandbox_payload,
     fetch_required_artifacts,
     run_sandbox_turn,
@@ -23,7 +25,7 @@ EXPECTED_RESULT = {
     "source_sha": SOURCE_SHA,
     "changed_path": CANARY_PATH,
     "marker": CANARY_MARKER,
-    "test_command": "python -m unittest discover -s tests -v",
+    "test_command": TEST_COMMAND,
     "test_status": "pass",
     "remote_write_attempted": False,
 }
@@ -76,12 +78,17 @@ class SandboxPayloadTests(unittest.TestCase):
             environment["network"],
             {"access": "restricted", "allowed_domains": ["github.com"]},
         )
-        self.assertEqual(environment["packages"]["python"], ["jsonschema>=4.23,<5"])
+        self.assertEqual(
+            environment["packages"]["python"],
+            ["hatchling>=1.25", "jsonschema>=4.23,<5"],
+        )
 
-    def test_payload_pins_source_and_boundary(self):
+    def test_payload_pins_source_install_test_and_boundary(self):
         payload = build_sandbox_payload("routine")
         self.assertEqual(payload["metadata"]["source_sha"], SOURCE_SHA)
         self.assertIn(SOURCE_SHA, payload["input"])
+        self.assertIn(PROJECT_INSTALL_COMMAND, payload["input"])
+        self.assertIn(TEST_COMMAND, payload["input"])
         self.assertIn(CANARY_PATH, payload["input"])
         self.assertIn("Never push", payload["input"])
         self.assertIn(PATCH_ARTIFACT_PATH, payload["input"])
