@@ -109,6 +109,32 @@ def build_sandbox_payload(
     }
 
 
+def _final_output_text(
+    completed_parts: Mapping[tuple[int, str], Mapping[int, str]],
+) -> str:
+    """Reconstruct the final saved text item from completed stream parts.
+
+    Agents can emit multiple message items while they work. `output_index` orders those
+    saved items and `content_index` orders text parts inside an item, so progress text
+    must not be concatenated into the final response.
+    """
+    if not completed_parts:
+        return ""
+    highest_output_index = max(output_index for output_index, _ in completed_parts)
+    candidates = [
+        (item_id, parts)
+        for (output_index, item_id), parts in completed_parts.items()
+        if output_index == highest_output_index
+    ]
+    if len(candidates) != 1:
+        raise RuntimeError(
+            "sandbox stream had ambiguous final output items at output_index "
+            f"{highest_output_index}"
+        )
+    _, parts = candidates[0]
+    return "".join(parts[index] for index in sorted(parts)).strip()
+
+
 def run_sandbox_turn(
     payload: Mapping[str, Any],
     api_key: str,
@@ -133,7 +159,7 @@ def run_sandbox_turn(
 
     session_id: str | None = None
     root_turn_id: str | None = None
-    output_parts: list[str] = []
+    completed_parts: dict[tuple[int, str], dict[int, str]] = {}
     completed = False
 
     with opener(request, timeout=timeout) as response:
@@ -144,8 +170,20 @@ def run_sandbox_turn(
                 continue
             if event_type == "agent.session.turn.output_text.done":
                 text = event.get("text")
-                if isinstance(text, str):
-                    output_parts.append(text)
+                item_id = event.get("item_id")
+                output_index = event.get("output_index")
+                content_index = event.get("content_index")
+                if not isinstance(text, str):
+                    continue
+                if not isinstance(item_id, str) or not item_id:
+                    raise RuntimeError("sandbox output_text.done event had no item_id")
+                if not isinstance(output_index, int) or not isinstance(content_index, int):
+                    raise RuntimeError(
+                        "sandbox output_text.done event had invalid output/content index"
+                    )
+                completed_parts.setdefault((output_index, item_id), {})[
+                    content_index
+                ] = text
                 continue
             if event_type in {
                 "agent.session.requires_action",
@@ -186,7 +224,7 @@ def run_sandbox_turn(
     if not root_turn_id:
         raise RuntimeError("sandbox turn completed without a root turn identity")
 
-    output_text = "".join(output_parts).strip()
+    output_text = _final_output_text(completed_parts)
     if output_text != EXPECTED_FINAL_OUTPUT:
         raise RuntimeError(
             f"sandbox final output mismatch: expected {EXPECTED_FINAL_OUTPUT!r}, "
@@ -225,11 +263,7 @@ def list_session_artifacts(
     data = parsed.get("data")
     if not isinstance(data, list):
         raise RuntimeError("artifact list response did not contain a data array")
-    artifacts: list[dict[str, Any]] = []
-    for artifact in data:
-        if isinstance(artifact, dict):
-            artifacts.append(artifact)
-    return artifacts
+    return [artifact for artifact in data if isinstance(artifact, dict)]
 
 
 def download_artifact_content(
