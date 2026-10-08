@@ -1,12 +1,12 @@
 # GDL V2 Phase 1 — Agents API connectivity canary
 
-Status: **CANDIDATE / PREPARED / LIVE RUN BLOCKED UNTIL RESTRICTED APPLICATION KEY EXISTS**
+Status: **CANDIDATE / RESTRICTED KEY CONFIGURED / SESSION-CREATE LIVE PASS / ROOT-TURN COMPLETION VALIDATION IN PROGRESS**
 
 Linked work unit: GitHub Issue #5. Depends on Phase 0 Draft PR #4.
 
 ## Purpose
 
-Prove only that the GDL V2 application can create a managed Codex/Agents API session with the explicit route selected by the Phase 0 model guard.
+Prove that the GDL V2 application can run one managed Codex/Agents API turn with the explicit route selected by the Phase 0 model guard and verify the turn's actual terminal outcome and final output.
 
 This phase deliberately does **not** give the managed agent a repository filesystem, GitHub write token, deployment credentials, or any other external-system capability. The canary uses `environment.type=none` and asks for one exact text response.
 
@@ -18,10 +18,12 @@ The current Agents API quickstart requires a project application API key with:
 - `api.agents.write`
 - `api.responses.write`
 
-Store the key outside source control as `OPENAI_API_KEY`. Never put it in Issue/PR text, committed files, command arguments, or logs.
+The restricted key is stored outside source control as GitHub repository secret `GDL_V2_OPENAI_API_KEY`. The workflow maps that secret to `OPENAI_API_KEY` only for the guarded live job. Never put the key in Issue/PR text, committed files, command arguments, or logs.
 
 Official references:
 - https://developers.openai.com/api/docs/guides/agents-api/quickstart
+- https://developers.openai.com/api/docs/guides/agents-api/sessions
+- https://developers.openai.com/api/docs/guides/agents-api/sessions/events
 - https://developers.openai.com/api/docs/guides/agents-api/environments/security
 
 ## Dry run
@@ -55,7 +57,7 @@ python scripts/gdl_v2_agents_connectivity.py --task-class routine --live
 
 The command fails closed unless `OPENAI_API_KEY` is present. The key is used only in the HTTP `Authorization` header and is not included in the JSON payload or printed output.
 
-The live canary creates a session at `/v1/agents/sessions` with:
+The live canary POSTs to `/v1/agents/sessions` with `stream: true` and:
 
 - explicit model from the route guard
 - explicit `reasoning.effort`
@@ -63,8 +65,33 @@ The live canary creates a session at `/v1/agents/sessions` with:
 - no tools
 - a non-destructive instruction to return exactly `GDL_V2_CONNECTIVITY_OK`
 
-This phase records only non-secret response metadata such as session ID/status. It does not claim full success merely because session creation returned; a later live validation must reconcile the session/turn outcome before promoting the path.
+## PASS contract
+
+Session creation or `agent.session.idle` alone is not success. The live run consumes the Agents API event stream and PASS requires all of the following:
+
+1. A session identity is observed.
+2. The root turn emits `agent.session.turn.completed`.
+3. The final `agent.session.turn.output_text.done` text resolves exactly to `GDL_V2_CONNECTIVITY_OK`.
+4. No root-turn failure/cancellation, session/environment failure, or unexpected required action occurs.
+
+The command fails closed if the stream closes before root-turn completion, if output differs, if the stream is malformed, or if the session identity is missing.
+
+## GitHub Actions guard
+
+The branch-scoped workflow runs only on `gdl-v2-agents-connectivity-canary`.
+
+- Ordinary pushes run the guard job but skip the paid connectivity job.
+- The paid live job runs only when the commit message contains exact marker `[gdl-v2-live]`.
+- Workflow permission is `contents: read` only.
+- No merge, release, deploy, or repository-write path exists in this phase.
+
+## Evidence so far
+
+- Initial ordinary-push guard canary: PASS; paid connectivity step skipped as designed.
+- First explicit live marker run: Agents API session creation/connectivity job PASS, proving the restricted GitHub secret and selected route can reach the managed API.
+- That first live implementation only checked session-creation response metadata, so it is not sufficient for Phase 1 completion.
+- Current change strengthens the live path to stream and verify the root turn and exact output before PASS.
 
 ## Current stop boundary
 
-Do not run live until the restricted application key has been created and stored outside the repository. Do not add GitHub/repository write capability in Phase 1. The next phase will design a bounded code-change transport separately so the model never needs a broad GitHub credential merely to edit code.
+Do not add GitHub/repository write capability in Phase 1. After a completion-verified live canary and green CI, Phase 1 may be marked PASS. Phase 2 must design a separately bounded code-change transport before any managed agent receives repository-write capability.
