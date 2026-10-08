@@ -1,0 +1,97 @@
+name: GDL V2 Issue 25 Unknown Outcome Reconciliation
+
+on:
+  push:
+    branches:
+      - 'gdl-v2/work/issue-25-temp-astra'
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Reconcile matching Agents session read-only
+        env:
+          OPENAI_API_KEY: ${{ secrets.GDL_V2_OPENAI_API_KEY }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from urllib.parse import urlencode
+          from urllib.request import Request, urlopen
+
+          WORK_UNIT = "issue-25-temp-astra"
+          CONTRACT = "32c9fd3796acea682bc37c48e6207f15d5a5cd4a5f1756f87ccfcf5f643c0917"
+          BASE = "https://api.openai.com/v1/agents/sessions"
+          KEY = os.environ["OPENAI_API_KEY"]
+          HEADERS = {"Authorization": f"Bearer {KEY}", "OpenAI-Beta": "agents=v1"}
+
+          def get(url):
+              req = Request(url, headers=HEADERS, method="GET")
+              with urlopen(req, timeout=30) as response:
+                  return json.loads(response.read().decode("utf-8"))
+
+          def safe_error(value):
+              if not isinstance(value, dict):
+                  return None
+              return {k: value.get(k) for k in ("type", "code", "message") if value.get(k) is not None}
+
+          page = get(BASE + "?" + urlencode({"limit": 100, "order": "desc"}))
+          matches = []
+          for session in page.get("data", []):
+              metadata = session.get("metadata") if isinstance(session.get("metadata"), dict) else {}
+              if metadata.get("work_unit") != WORK_UNIT and metadata.get("contract_sha256") != CONTRACT:
+                  continue
+              sid = session.get("id")
+              turns = get(f"{BASE}/{sid}/turns?" + urlencode({"limit": 100, "order": "desc"})).get("data", [])
+              turn_summaries = []
+              for t in turns:
+                  tid = t.get("id")
+                  detail = get(f"{BASE}/{sid}/turns/{tid}") if tid else {}
+                  turn_summaries.append({
+                      "id": tid,
+                      "status": detail.get("status", t.get("status")),
+                      "created_at": detail.get("created_at", t.get("created_at")),
+                      "completed_at": detail.get("completed_at", t.get("completed_at")),
+                      "subagent_id": detail.get("subagent_id", t.get("subagent_id")),
+                      "error": safe_error(detail.get("error")),
+                  })
+              artifacts = get(f"{BASE}/{sid}/artifacts?" + urlencode({"limit": 100, "order": "desc"})).get("data", [])
+              matches.append({
+                  "session_id": sid,
+                  "status": session.get("status"),
+                  "created_at": session.get("created_at"),
+                  "metadata": {k: metadata.get(k) for k in (
+                      "gdl_version", "gate", "work_unit", "issue_number",
+                      "task_class", "source_sha", "contract_sha256"
+                  ) if k in metadata},
+                  "agent": {
+                      "model": (session.get("agent") or {}).get("model") if isinstance(session.get("agent"), dict) else None,
+                      "reasoning": (session.get("agent") or {}).get("reasoning") if isinstance(session.get("agent"), dict) else None,
+                  },
+                  "turns": turn_summaries,
+                  "artifacts": [{
+                      "id": a.get("id"), "path": a.get("path"),
+                      "created_at": a.get("created_at"), "turn_id": a.get("turn_id"),
+                  } for a in artifacts],
+              })
+
+          result = {
+              "work_unit": WORK_UNIT,
+              "contract_sha256": CONTRACT,
+              "matches": matches,
+              "match_count": len(matches),
+          }
+          with open("issue25-reconcile.json", "w", encoding="utf-8") as f:
+              json.dump(result, f, sort_keys=True, indent=2)
+              f.write("\n")
+          print(json.dumps(result, sort_keys=True, indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gdl-v2-issue25-reconciliation
+          path: issue25-reconcile.json
+          if-no-files-found: error
+          retention-days: 14
