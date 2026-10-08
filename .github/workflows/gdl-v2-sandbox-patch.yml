@@ -1,0 +1,55 @@
+name: GDL V2 Sandbox Patch Canary
+
+on:
+  push:
+    branches:
+      - gdl-v2-sandbox-patch-canary
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gdl-v2-sandbox-patch-canary
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report sandbox canary gate
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          if [[ "$COMMIT_MESSAGE" == *"[gdl-v2-sandbox-live]"* ]]; then
+            echo "Explicit hosted-sandbox live marker detected."
+          else
+            echo "No hosted-sandbox live marker. Paid Agents API sandbox step remains disabled."
+          fi
+
+  sandbox:
+    if: ${{ contains(github.event.head_commit.message, '[gdl-v2-sandbox-live]') }}
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install canary package
+        run: python -m pip install -e .
+      - name: Run one bounded hosted-sandbox patch-artifact canary
+        env:
+          OPENAI_API_KEY: ${{ secrets.GDL_V2_OPENAI_API_KEY }}
+        run: |
+          python scripts/gdl_v2_sandbox_patch_canary.py \
+            --task-class routine \
+            --output-dir gdl-v2-sandbox-artifacts \
+            --live
+      - name: Preserve independently verified sandbox evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gdl-v2-sandbox-patch-evidence
+          path: gdl-v2-sandbox-artifacts/
+          if-no-files-found: error
+          retention-days: 7
