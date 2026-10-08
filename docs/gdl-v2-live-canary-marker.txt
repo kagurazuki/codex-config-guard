@@ -1,3 +1,4 @@
 GDL V2 live-connectivity canary marker.
-This file exists only to trigger one bounded Agents API connectivity test on the canary branch.
-No production cutover is authorized.
+This revision triggers one completion-verified Agents API connectivity test on the canary branch.
+PASS now requires a root turn.completed event and exact output GDL_V2_CONNECTIVITY_OK.
+No repository-write capability or production cutover is authorized.
