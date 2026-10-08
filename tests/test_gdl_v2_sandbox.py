@@ -20,7 +20,6 @@ from codex_config_guard.gdl_v2_sandbox import (
     validate_result_text,
 )
 
-
 EXPECTED_RESULT = {
     "source_sha": SOURCE_SHA,
     "changed_path": CANARY_PATH,
@@ -38,6 +37,16 @@ index 0000000..1111111
 @@ -0,0 +1 @@
 +{CANARY_MARKER}
 """
+
+
+def _text_done(text: str, output_index: int, *, item_id: str | None = None, content_index: int = 0):
+    return {
+        "type": "agent.session.turn.output_text.done",
+        "item_id": item_id or f"msg_{output_index}",
+        "output_index": output_index,
+        "content_index": content_index,
+        "text": text,
+    }
 
 
 class _FakeStreamResponse:
@@ -103,14 +112,18 @@ class SandboxPayloadTests(unittest.TestCase):
 
 
 class SandboxTurnTests(unittest.TestCase):
+    def _run(self, events):
+        return run_sandbox_turn(
+            build_sandbox_payload("routine"),
+            "sk-test",
+            opener=lambda request, timeout: _FakeStreamResponse(events),
+        )
+
     def test_root_completion_and_exact_output_are_required(self):
         captured = {}
         events = [
             {"type": "agent.session.created", "session": {"id": "sess_2"}},
-            {
-                "type": "agent.session.turn.output_text.done",
-                "text": EXPECTED_FINAL_OUTPUT,
-            },
+            _text_done(EXPECTED_FINAL_OUTPUT, 0),
             {
                 "type": "agent.session.turn.completed",
                 "turn": {"id": "turn_2", "subagent_id": None},
@@ -132,21 +145,53 @@ class SandboxTurnTests(unittest.TestCase):
         self.assertNotIn("sk-sandbox-test", captured["body"])
         self.assertTrue(json.loads(captured["body"])["stream"])
 
+    def test_progress_items_do_not_pollute_final_output(self):
+        events = [
+            {"type": "agent.session.created", "session": {"id": "sess_progress"}},
+            _text_done("Cloning pinned source.", 0, item_id="msg_progress_0"),
+            _text_done("All tests passed.", 1, item_id="msg_progress_1"),
+            _text_done(EXPECTED_FINAL_OUTPUT, 2, item_id="msg_final"),
+            {
+                "type": "agent.session.turn.completed",
+                "turn": {"id": "turn_progress", "subagent_id": None},
+            },
+        ]
+        result = self._run(events)
+        self.assertEqual(result["output_text"], EXPECTED_FINAL_OUTPUT)
+
+    def test_multiple_content_parts_of_final_item_are_reconstructed(self):
+        events = [
+            {"type": "agent.session.created", "session": {"id": "sess_parts"}},
+            _text_done("progress", 0),
+            _text_done("GDL_V2_", 1, item_id="msg_final", content_index=0),
+            _text_done("SANDBOX_OK", 1, item_id="msg_final", content_index=1),
+            {
+                "type": "agent.session.turn.completed",
+                "turn": {"id": "turn_parts", "subagent_id": None},
+            },
+        ]
+        result = self._run(events)
+        self.assertEqual(result["output_text"], EXPECTED_FINAL_OUTPUT)
+
     def test_output_mismatch_fails_closed(self):
         events = [
             {"type": "agent.session.created", "session": {"id": "sess_bad"}},
-            {"type": "agent.session.turn.output_text.done", "text": "WRONG"},
+            _text_done("WRONG", 0),
             {
                 "type": "agent.session.turn.completed",
                 "turn": {"id": "turn_bad", "subagent_id": None},
             },
         ]
         with self.assertRaisesRegex(RuntimeError, "output mismatch"):
-            run_sandbox_turn(
-                build_sandbox_payload("routine"),
-                "sk-test",
-                opener=lambda request, timeout: _FakeStreamResponse(events),
-            )
+            self._run(events)
+
+    def test_missing_output_indices_fail_closed(self):
+        events = [
+            {"type": "agent.session.created", "session": {"id": "sess_bad"}},
+            {"type": "agent.session.turn.output_text.done", "text": EXPECTED_FINAL_OUTPUT},
+        ]
+        with self.assertRaisesRegex(RuntimeError, "invalid output/content index"):
+            self._run(events)
 
     def test_root_failure_fails_closed(self):
         events = [
@@ -161,11 +206,7 @@ class SandboxTurnTests(unittest.TestCase):
             },
         ]
         with self.assertRaisesRegex(RuntimeError, "sandbox synthetic failure"):
-            run_sandbox_turn(
-                build_sandbox_payload("routine"),
-                "sk-test",
-                opener=lambda request, timeout: _FakeStreamResponse(events),
-            )
+            self._run(events)
 
 
 class ArtifactTests(unittest.TestCase):
@@ -175,21 +216,9 @@ class ArtifactTests(unittest.TestCase):
         turn_id = "turn_artifact"
         list_payload = {
             "data": [
-                {
-                    "id": "artifact_patch",
-                    "turn_id": turn_id,
-                    "path": PATCH_ARTIFACT_PATH,
-                },
-                {
-                    "id": "artifact_result",
-                    "turn_id": turn_id,
-                    "path": RESULT_ARTIFACT_PATH,
-                },
-                {
-                    "id": "artifact_old",
-                    "turn_id": "turn_old",
-                    "path": PATCH_ARTIFACT_PATH,
-                },
+                {"id": "artifact_patch", "turn_id": turn_id, "path": PATCH_ARTIFACT_PATH},
+                {"id": "artifact_result", "turn_id": turn_id, "path": RESULT_ARTIFACT_PATH},
+                {"id": "artifact_old", "turn_id": "turn_old", "path": PATCH_ARTIFACT_PATH},
             ]
         }
         observed_urls = []
@@ -229,11 +258,7 @@ class ArtifactTests(unittest.TestCase):
     def test_missing_required_artifact_fails(self):
         payload = {
             "data": [
-                {
-                    "id": "artifact_patch",
-                    "turn_id": "turn_x",
-                    "path": PATCH_ARTIFACT_PATH,
-                }
+                {"id": "artifact_patch", "turn_id": "turn_x", "path": PATCH_ARTIFACT_PATH}
             ]
         }
         with tempfile.TemporaryDirectory() as tmp:
