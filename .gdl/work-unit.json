@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "work_unit": "issue-22-current-cutover-r2",
+  "issue_number": 22,
+  "task_class": "critical",
+  "source_sha": "2eb0346553911e0c75555bbecafaab9b0a572d24",
+  "summary": "Finalize the explicitly authorized GDL V2 Current cutover state while preserving every proven execution and security boundary",
+  "instructions": "Implement Issue #22 exactly from the cutover-authority source. The repository-level AGENTS.md at this source explicitly authorizes Issue #22 to prepare the final Current-state patch after Promotion Gate #20 PROMOTION_READY and the user's separate cutover authorization. The earlier Issue #22 attempt from the pre-authorization source correctly refused semantic cutover; do not reproduce that obsolete candidate-preserving patch. Change the generic GDL V2 work-unit surface to final Current wording/state. After the eventual caller-side audited merge, V2 is Current and GDL v0.2 is retained intact as the rollback path, not Current. Update AGENTS.md from transitional cutover-authority wording to durable Current instructions. Update productionization/current/rollback docs accordingly, preserving historical candidate/canary facts only when clearly labeled historical. Remove candidate-only naming from the generic workflow and CLI. Update managed payload operational wording and metadata so new work units identify V2 as Current; historical evidence strings may remain only where clearly marked as pre-cutover compatibility/evidence. Preserve every proven safety boundary: explicit model/reasoning floors and silent-downgrade rejection, deterministic work-unit branch/marker, duplicate/rerun fail-closed, dispatch receipt and unknown-outcome reconciliation, read-only GitHub workflow token, persist-credentials false, caller-only OpenAI API key outside payload/sandbox, no Codex GitHub credential, restricted hosted sandbox, exact source binding, bounded path/count authority, allowlisted unit tests, full patch/result/digest verification, caller-only controlled GitHub write-back, and no direct-to-main Codex path. Keep GDL v0.2 code/path available for rollback. Add or update tests so durable Current semantics are asserted without weakening legacy safety tests. Codex must not push, commit, open/update PRs, merge, close, release, deploy, publish, or mutate any remote system. Run the complete allowlisted unit profile and return the fixed success marker only after artifact re-verification.",
+  "allowed_paths": [
+    "AGENTS.md",
+    "docs/gdl-v2-productionization.md",
+    ".github/workflows/gdl-v2-work-unit.yml",
+    "scripts/gdl_v2_work_unit.py",
+    "src/codex_config_guard/gdl_v2_production.py",
+    "tests/test_gdl_v2_production.py"
+  ],
+  "max_changed_files": 6,
+  "test_profile": "unit",
+  "route": {
+    "model": "gpt-6-astra",
+    "reasoning_effort": "high"
+  }
+}
