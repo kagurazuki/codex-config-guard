@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "work_unit": "issue-18-scope-hardening",
+  "issue_number": 18,
+  "task_class": "standard",
+  "source_sha": "c8e6c2042158535aa55ea6c8be49f10c80ffa1ff",
+  "summary": "Reject overlapping or redundant allowed-path scopes in V2 work-unit contracts",
+  "instructions": "Implement Issue #18. Harden schema-v1 authority minimization by rejecting overlapping or redundant allowed_paths scopes. Reject a directory scope together with any descendant directory or exact file it already authorizes, while keeping disjoint sibling scopes valid. Preserve exact-file versus trailing-slash directory semantics and all existing traversal, .git, bounds, route, duplicate-trigger, and artifact-verification behavior. Add focused tests and run the full allowlisted unit profile.",
+  "allowed_paths": [
+    "src/codex_config_guard/gdl_v2_work_unit.py",
+    "tests/test_gdl_v2_work_unit.py"
+  ],
+  "max_changed_files": 2,
+  "test_profile": "unit",
+  "route": {
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "high"
+  }
+}
