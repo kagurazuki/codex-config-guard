@@ -1,0 +1,3 @@
+GDL V2 live-connectivity canary marker.
+This file exists only to trigger one bounded Agents API connectivity test on the canary branch.
+No production cutover is authorized.
