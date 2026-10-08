@@ -54,9 +54,50 @@ class WorkUnitContractTests(unittest.TestCase):
         for scope in bad_scopes:
             with self.subTest(scope=scope), self.assertRaises(ValueError):
                 validate_contract_data({**VALID_DATA, "allowed_paths": [scope]})
-        for scopes in ([], ["docs/", "docs/"], [None], "docs/", [f"docs/file{i}.txt" for i in range(33)]):
+        for scopes in ([], ["docs/", "docs/"], ["README.md", "README.md"], [None], "docs/",
+                       [f"docs/file{i}.txt" for i in range(33)]):
             with self.subTest(scopes=scopes), self.assertRaises(ValueError):
                 validate_contract_data({**VALID_DATA, "allowed_paths": scopes})
+
+    def test_rejects_directory_scopes_with_authorized_descendants(self):
+        pairs = [
+            ("src/", "src/module/"),
+            ("src/", "src/module/nested/"),
+            ("src/", "src/feature.py"),
+            ("src/", "src/module/nested/feature.py"),
+            ("src/module/", "src/module/feature.py"),
+        ]
+        for parent, descendant in pairs:
+            for scopes in ([parent, descendant], [descendant, parent], [descendant, "README.md", parent]):
+                with self.subTest(scopes=scopes), self.assertRaisesRegex(ValueError, "overlapping allowed_paths"):
+                    validate_contract_data({**VALID_DATA, "allowed_paths": scopes})
+
+    def test_disjoint_sibling_scopes_remain_valid(self):
+        scopes = ["src/api/", "src/api_client/", "src/api.py", "src/cli/", "docs/", "docs-extra/", "README.md", "README.md.bak"]
+        for ordered in (scopes, list(reversed(scopes))):
+            with self.subTest(scopes=ordered):
+                contract = validate_contract_data({**VALID_DATA, "allowed_paths": ordered})
+                self.assertEqual(contract.allowed_paths, tuple(ordered))
+                self.assertEqual(validate_contract_data(contract.as_dict()), contract)
+                for path in ("src/api/feature.py", "src/api_client/feature.py", "src/api.py", "src/cli/main.py",
+                             "docs/guide.md", "docs-extra/guide.md", "README.md", "README.md.bak"):
+                    self.assertTrue(contract.allows(path), path)
+                for path in ("src/apis/feature.py", "src/api.py/extra", "docs-other/guide.md", "README.md/extra"):
+                    self.assertFalse(contract.allows(path), path)
+
+    def test_exact_file_scopes_do_not_authorize_descendants(self):
+        cases = [
+            (["docs", "docs/"], "docs/nested/guide.md", "docs-other/guide.md"),
+            (["docs", "docs/guide.md"], "docs/guide.md", "docs/guide.md/extra"),
+            (["docs", "docs/nested/"], "docs/nested/guide.md", "docs/guide.md"),
+        ]
+        for scopes, allowed, rejected in cases:
+            for ordered in (scopes, list(reversed(scopes))):
+                with self.subTest(scopes=ordered):
+                    contract = validate_contract_data({**VALID_DATA, "allowed_paths": ordered})
+                    self.assertTrue(contract.allows("docs"))
+                    self.assertTrue(contract.allows(allowed), allowed)
+                    self.assertFalse(contract.allows(rejected), rejected)
 
     def test_rejects_invalid_sha_and_task_class(self):
         for sha in (None, "HEAD", "a" * 39, "A" * 40, "g" * 40, "0" * 40, "a" * 40 + "\n"):
