@@ -19,6 +19,11 @@ Productionization history remains auditable:
   `usage_limit_exceeded` failure with no implementation artifacts. That recovery is
   historical cutover evidence, not a general bypass around the managed work-unit path.
 - Final audited merge/main evidence and `CURRENT_CUTOVER_PASS` are recorded in Issue #22.
+- Issue #25 temporarily changes the active **Current generic work-unit** routing
+  preference to Astra/high for every task class. Its single managed Astra/high attempt
+  failed terminally with `usage_limit_exceeded` and no implementation artifacts;
+  Recovery Issue #26 records the bounded control-plane finalization. This recovery is
+  specific to that routing configuration change and is not a general managed-execution bypass.
 
 ## Surfaces and authority
 
@@ -61,7 +66,7 @@ input, not a patch change to inject into the sandbox. A typical Current contract
   ],
   "max_changed_files": 2,
   "test_profile": "unit",
-  "route": {"model": "gpt-6.1-sol", "reasoning_effort": "high"}
+  "route": {"model": "gpt-6-astra", "reasoning_effort": "high"}
 }
 ```
 
@@ -82,14 +87,43 @@ signed-32-bit Issue numbers. SHAs are full lowercase 40-hex identities excluding
 all-zero. `schema_version` must be integer `1`.
 
 `route` is optional but resolves to an explicit deterministic route. Partial or
-invalid requests fail. The Current guard rejects model/effort downgrades and allows
-reviewed upward escalation:
+invalid requests fail. Current generic work-unit contracts enforce the active
+Current policy floor and never rely on an unspecified provider model default.
+Historical Phase 0–4 canary/helper route resolution remains on the original balanced
+baseline so old canary evidence and regression behavior are not silently rewritten.
+
+### Temporary Astra/high Current routing policy
+
+`src/codex_config_guard/gdl_v2_router.py` currently has:
+
+```python
+ACTIVE_CURRENT_ROUTE_POLICY = "astra-high-temporary"
+```
+
+While that selector is active, every **Current generic work-unit** task class defaults
+to and is floored at:
+
+- routine/focused: `gpt-6-astra` / `high`
+- standard coding/professional: `gpt-6-astra` / `high`
+- hardest/high-impact: `gpt-6-astra` / `high`
+
+Therefore Luna or Sol requests for routine/standard Current work units fail route
+validation instead of silently using a lower-capability model.
+
+The prior balanced Current policy is preserved intact in the same module:
 
 - routine/focused: `gpt-6-luna` / `max`
 - standard coding/professional: `gpt-6.1-sol` / `high`
 - hardest/high-impact: `gpt-6-astra` / `high`
 
-Neither payload nor metadata relies on an unspecified provider model default.
+To restore the previous balanced Current behavior, change only the selector to:
+
+```python
+ACTIVE_CURRENT_ROUTE_POLICY = "balanced"
+```
+
+Do not reconstruct the old mapping or weaken route validation. Tests cover both
+policy definitions so the rollback is a selector change rather than a routing rewrite.
 
 Only `unit` is currently allowlisted, mapping to
 `python -m unittest discover -s tests -v`. Contracts cannot supply arbitrary test
@@ -197,7 +231,9 @@ A fresh paid retry after a confirmed terminal failure is not automatic. It requi
 a separately reviewed recovery protocol that states why reuse/retry is safe and how
 the original identity remains auditable. Issue #23 is historical evidence of one
 such protocol for the Current cutover governance transition after R3 failed with
-`usage_limit_exceeded`; it does not grant ordinary tasks a general control-plane
+`usage_limit_exceeded`. Issue #26 separately records the Issue #25 routing-policy
+recovery after its single Astra/high attempt failed with the same provider code and
+no artifacts. Neither recovery grants ordinary tasks a general control-plane
 implementation bypass.
 
 ## Current status and rollback
@@ -210,7 +246,16 @@ credential, routing, patch-verification, duplicate, or recovery architecture.
 No release, deploy, package publication, secret change, or automatic Issue closure
 is implied by Current status.
 
-Rollback is fail-safe and preserves evidence:
+There are two distinct rollback actions:
+
+1. **Routing-policy rollback:** if only the temporary Astra/high preference should be
+   removed, change `ACTIVE_CURRENT_ROUTE_POLICY` in `gdl_v2_router.py` from
+   `"astra-high-temporary"` to `"balanced"`. This restores the preserved Luna/Sol/Astra
+   balanced mapping without disabling GDL V2 Current.
+2. **Execution-surface rollback:** if Current V2 itself must be stopped, follow the
+   fail-safe sequence below and route new bounded development through preserved GDL v0.2.
+
+Execution-surface rollback remains fail-safe and preserves evidence:
 
 1. Stop creation of new generic V2 Current triggers.
 2. Reconcile every in-flight or unknown V2 work unit before overlapping work resumes.

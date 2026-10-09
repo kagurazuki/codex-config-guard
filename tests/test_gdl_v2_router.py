@@ -1,6 +1,16 @@
 import unittest
 
-from codex_config_guard.gdl_v2_router import select_route, validate_route
+from codex_config_guard.gdl_v2_router import (
+    ACTIVE_CURRENT_ROUTE_POLICY,
+    CURRENT_DEFAULT_ROUTES_BY_POLICY,
+    CURRENT_TASK_MIN_MODEL_BY_POLICY,
+    DEFAULT_ROUTES,
+    TASK_MIN_MODEL,
+    select_current_route,
+    select_route,
+    validate_current_route,
+    validate_route,
+)
 
 
 class GdlV2RouteTests(unittest.TestCase):
@@ -43,9 +53,46 @@ class GdlV2RouteTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "below reasoning floor"):
             validate_route("standard", "gpt-6.1-sol", "medium")
 
+    def test_current_policy_selector_is_supported(self):
+        self.assertIn(ACTIVE_CURRENT_ROUTE_POLICY, CURRENT_DEFAULT_ROUTES_BY_POLICY)
+        self.assertIn(ACTIVE_CURRENT_ROUTE_POLICY, CURRENT_TASK_MIN_MODEL_BY_POLICY)
+        for task_class in ("routine", "standard", "critical"):
+            self.assertEqual(
+                select_current_route(task_class),
+                CURRENT_DEFAULT_ROUTES_BY_POLICY[ACTIVE_CURRENT_ROUTE_POLICY][task_class],
+            )
+
+    def test_temporary_current_policy_is_astra_high_for_all_classes(self):
+        for task_class in ("routine", "standard", "critical"):
+            route = CURRENT_DEFAULT_ROUTES_BY_POLICY["astra-high-temporary"][task_class]
+            self.assertEqual(route.model, "gpt-6-astra")
+            self.assertEqual(route.reasoning_effort, "high")
+            self.assertEqual(CURRENT_TASK_MIN_MODEL_BY_POLICY["astra-high-temporary"][task_class], "gpt-6-astra")
+
+    def test_balanced_current_policy_reuses_preserved_baseline(self):
+        self.assertIs(CURRENT_DEFAULT_ROUTES_BY_POLICY["balanced"], DEFAULT_ROUTES)
+        self.assertIs(CURRENT_TASK_MIN_MODEL_BY_POLICY["balanced"], TASK_MIN_MODEL)
+
+    def test_active_current_model_floor_is_enforced(self):
+        if ACTIVE_CURRENT_ROUTE_POLICY == "astra-high-temporary":
+            with self.assertRaisesRegex(ValueError, "below Current model floor"):
+                validate_current_route("routine", "gpt-6-luna", "max")
+            with self.assertRaisesRegex(ValueError, "below Current model floor"):
+                validate_current_route("standard", "gpt-6.1-sol", "high")
+        else:
+            self.assertEqual(validate_current_route("routine", "gpt-6-luna", "max").model, "gpt-6-luna")
+            self.assertEqual(validate_current_route("standard", "gpt-6.1-sol", "high").model, "gpt-6.1-sol")
+
+    def test_current_astra_high_is_valid_for_every_class(self):
+        for task_class in ("routine", "standard", "critical"):
+            route = validate_current_route(task_class, "gpt-6-astra", "high")
+            self.assertEqual((route.model, route.reasoning_effort), ("gpt-6-astra", "high"))
+
     def test_unknown_task_class_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "unsupported task class"):
             select_route("unknown")  # type: ignore[arg-type]
+        with self.assertRaisesRegex(ValueError, "unsupported task class"):
+            select_current_route("unknown")  # type: ignore[arg-type]
 
     def test_unknown_model_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "unsupported model"):

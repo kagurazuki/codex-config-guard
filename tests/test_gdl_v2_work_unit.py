@@ -5,6 +5,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from codex_config_guard.gdl_v2_router import (
+    ACTIVE_CURRENT_ROUTE_POLICY, CURRENT_DEFAULT_ROUTES_BY_POLICY,
+)
 from codex_config_guard.gdl_v2_work_unit import (
     MAX_CONTRACT_BYTES, branch_name, load_contract, run_marker, strict_json,
     validate_contract_data, validate_trigger, verify_git_trigger,
@@ -24,8 +27,8 @@ HEAD = "a" * 40
 class WorkUnitContractTests(unittest.TestCase):
     def test_valid_multi_path_real_code_contract(self):
         contract = validate_contract_data(VALID_DATA)
-        self.assertEqual(contract.route.model, "gpt-6.1-sol")
-        self.assertEqual(contract.route.reasoning_effort, "high")
+        expected = CURRENT_DEFAULT_ROUTES_BY_POLICY[ACTIVE_CURRENT_ROUTE_POLICY]["standard"]
+        self.assertEqual(contract.route, expected)
         for path in ("src/codex_config_guard/feature.py", "tests/test_feature.py", "docs/guide.md", "README.md"):
             self.assertTrue(contract.allows(path))
         for path in ("src-other/file.py", "src/codex_config_guardian/file.py", "README.md/extra", "LICENSE"):
@@ -134,14 +137,38 @@ class WorkUnitContractTests(unittest.TestCase):
                     load_contract(path)
 
     def test_route_selection_escalation_and_silent_downgrade_rejection(self):
-        for task, model, effort in (("routine", "gpt-6-luna", "max"), ("standard", "gpt-6.1-sol", "high"), ("critical", "gpt-6-astra", "high")):
+        for task in ("routine", "standard", "critical"):
             contract = validate_contract_data({**VALID_DATA, "task_class": task})
-            self.assertEqual((contract.route.model, contract.route.reasoning_effort), (model, effort))
+            expected = CURRENT_DEFAULT_ROUTES_BY_POLICY[ACTIVE_CURRENT_ROUTE_POLICY][task]
+            self.assertEqual(contract.route, expected)
+
         upgrade = {"model": "gpt-6-astra", "reasoning_effort": "max"}
         self.assertEqual(validate_contract_data({**VALID_DATA, "route": upgrade}).route.model, upgrade["model"])
-        for route in (None, {}, {"model": "gpt-6.1-sol"}, {"model": "gpt-6-luna", "reasoning_effort": "max"},
-                      {"model": "gpt-6.1-sol", "reasoning_effort": "medium"}, {"model": "default", "reasoning_effort": "high"},
-                      {"model": [], "reasoning_effort": "high"}, {**upgrade, "fallback": "default"}):
+
+        invalid_routes = [
+            None,
+            {},
+            {"model": "gpt-6.1-sol"},
+            {"model": "gpt-6.1-sol", "reasoning_effort": "medium"},
+            {"model": "default", "reasoning_effort": "high"},
+            {"model": [], "reasoning_effort": "high"},
+            {**upgrade, "fallback": "default"},
+        ]
+        if ACTIVE_CURRENT_ROUTE_POLICY == "astra-high-temporary":
+            invalid_routes.extend([
+                {"model": "gpt-6-luna", "reasoning_effort": "max"},
+                {"model": "gpt-6.1-sol", "reasoning_effort": "high"},
+            ])
+        else:
+            self.assertEqual(
+                validate_contract_data({**VALID_DATA, "task_class": "routine", "route": {"model": "gpt-6-luna", "reasoning_effort": "max"}}).route.model,
+                "gpt-6-luna",
+            )
+            self.assertEqual(
+                validate_contract_data({**VALID_DATA, "task_class": "standard", "route": {"model": "gpt-6.1-sol", "reasoning_effort": "high"}}).route.model,
+                "gpt-6.1-sol",
+            )
+        for route in invalid_routes:
             with self.subTest(route=route), self.assertRaises(ValueError):
                 validate_contract_data({**VALID_DATA, "route": route})
 

@@ -15,7 +15,9 @@ from codex_config_guard.gdl_v2_production import (
     MAX_PATCH_BYTES, build_work_unit_instruction, build_work_unit_payload,
     expected_result, extract_changed_paths, validate_artifacts, validate_downloaded_artifacts, validate_patch,
 )
-from codex_config_guard.gdl_v2_router import ModelRoute
+from codex_config_guard.gdl_v2_router import (
+    ACTIVE_CURRENT_ROUTE_POLICY, CURRENT_DEFAULT_ROUTES_BY_POLICY, ModelRoute,
+)
 from codex_config_guard.gdl_v2_sandbox import PATCH_ARTIFACT_PATH, RESULT_ARTIFACT_PATH, TEST_COMMAND
 from codex_config_guard.gdl_v2_work_unit import validate_contract_data
 from tests.test_gdl_v2_work_unit import VALID_DATA
@@ -224,8 +226,10 @@ class CliTests(unittest.TestCase):
         transport.assert_not_called()
         key.assert_not_called()
         data = json.loads(self.stdout.getvalue())
+        expected = CURRENT_DEFAULT_ROUTES_BY_POLICY[ACTIVE_CURRENT_ROUTE_POLICY]["standard"]
         self.assertEqual(data["mode"], "dry-run")
-        self.assertEqual(data["route"]["model"], "gpt-6.1-sol")
+        self.assertEqual(data["route"]["model"], expected.model)
+        self.assertEqual(data["route"]["reasoning_effort"], expected.reasoning_effort)
 
     def test_explicit_live_still_needs_environment_key_and_trigger(self):
         with patch.dict(os.environ, {}, clear=True), patch.object(self.cli, "verify_git_trigger", return_value={}), patch.object(self.cli, "run_sandbox_turn") as transport:

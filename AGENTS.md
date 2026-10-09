@@ -37,12 +37,16 @@ recovery is historical cutover evidence, not a general alternative execution pat
 ## Model routing
 
 - The orchestrator must choose an explicit route. Never silently rely on an unspecified/default model for a V2 task.
-- Validate the route with `codex_config_guard.gdl_v2_router` before execution wiring uses it.
-- Minimum Current routes are:
+- Validate Current work-unit routes with the Current-policy routing helpers in `codex_config_guard.gdl_v2_router`.
+- **Temporary Current policy:** `ACTIVE_CURRENT_ROUTE_POLICY = "astra-high-temporary"`.
+  While this selector is active, routine, standard, and critical **Current generic work units** all default to and are floored at `gpt-6-astra` with `high` reasoning. Luna and Sol requests for routine/standard Current work units must fail validation rather than silently downgrade.
+- Historical Phase 0–4 canary/helper routing remains on its original balanced behavior so prior evidence and regression semantics are not rewritten.
+- The prior balanced Current policy remains intact in code:
   - routine/focused: `gpt-6-luna` with `max`
   - standard coding/professional: `gpt-6.1-sol` with `high`
   - hardest/high-impact: `gpt-6-astra` with `high`
-- Upward escalation is allowed when needed for first-pass success; silent downgrade below the task-class floor is not.
+- To return Current work units to the prior balanced behavior, change only `ACTIVE_CURRENT_ROUTE_POLICY` in `src/codex_config_guard/gdl_v2_router.py` from `"astra-high-temporary"` to `"balanced"`. Do not reconstruct or edit the preserved balanced mapping.
+- Upward escalation remains allowed when needed for first-pass success; silent downgrade below the active Current task-class floor is not.
 
 ## Editing and tests
 
